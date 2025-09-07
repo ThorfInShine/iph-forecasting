@@ -1,0 +1,11 @@
+{
+  "existing_records": 10,
+  "new_records": 3,
+  "total_records": 11,
+  "duplicates_removed": 2,
+  "date_overlap": true,
+  "overlap_count": 2,
+  "timestamp": "2025-08-19T05:50:28.231064",
+  "backup_path": "data/backups/historical_data_backup_20250819_055028.csv",
+  "final_data_path": "data/historical_data.csv"
+}

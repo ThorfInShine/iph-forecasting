@@ -1,0 +1,599 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Data - IPH Forecasting{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3">
+    <h1 class="h2 text-gradient">
+        <i class="fas fa-upload me-2"></i>
+        Upload Data
+    </h1>
+    <div class="btn-toolbar">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Upload Instructions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Upload Instructions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-file-csv text-success me-2"></i>Supported Formats</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>CSV files (.csv)</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Excel files (.xlsx)</li>
+                            <li><i class="fas fa-exclamation-triangle text-warning me-2"></i>Maximum file size: 16MB</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-columns text-primary me-2"></i>Required Columns</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-calendar text-primary me-2"></i><code>Tanggal</code> - Date column</li>
+                            <li><i class="fas fa-chart-line text-primary me-2"></i><code>Indikator_Harga</code> - IPH values</li>
+                            <li><i class="fas fa-info text-info me-2"></i>Additional columns will be preserved</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="alert alert-warning mt-3 mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Note:</strong> Uploading new data will automatically retrain all models and generate new forecasts. This process may take a few minutes.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Area -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cloud-upload-alt text-primary me-2"></i>
+                    Upload Data File
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Upload Form -->
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <!-- Drag & Drop Area -->
+                    <div class="upload-area mb-4" id="uploadArea">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                            <h5>Drag & Drop your file here</h5>
+                            <p class="text-muted mb-3">or click to browse files</p>
+                            <button type="button" class="btn btn-primary" id="browseBtn">
+                                <i class="fas fa-folder-open me-2"></i>
+                                Choose File
+                            </button>
+                        </div>
+                        <input type="file" id="fileInput" name="file" accept=".csv,.xlsx" style="display: none;">
+                    </div>
+                    
+                    <!-- Upload Options -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="forecastWeeks" class="form-label">
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    Forecast Weeks
+                                </label>
+                                <select class="form-select" id="forecastWeeks" name="forecast_weeks">
+                                    <option value="4">4 weeks</option>
+                                    <option value="6">6 weeks</option>
+                                    <option value="8" selected>8 weeks</option>
+                                    <option value="10">10 weeks</option>
+                                    <option value="12">12 weeks</option>
+                                </select>
+                                <div class="form-text">Number of weeks to forecast after training</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-cog me-1"></i>
+                                    Processing Options
+                                </label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="autoRetrain" checked>
+                                    <label class="form-check-label" for="autoRetrain">
+                                        Auto-retrain models after upload
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="generateForecast" checked>
+                                    <label class="form-check-label" for="generateForecast">
+                                        Generate forecast immediately
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload Button -->
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-success btn-lg" id="uploadBtn" disabled>
+                            <i class="fas fa-upload me-2"></i>
+                            Upload and Process Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Preview Area -->
+<div id="filePreview" class="row mb-4" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-eye me-2"></i>
+                    File Preview
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="fileInfo"></div>
+                <div id="previewTable" class="table-responsive mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress -->
+<div id="uploadProgress" class="row mb-4" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="loading-spinner me-3"></div>
+                    <div>
+                        <h6 class="mb-0">Processing Data...</h6>
+                        <small class="text-muted" id="progressText">Uploading file...</small>
+                    </div>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         id="progressBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Area -->
+<div id="uploadResults"></div>
+
+<!-- Sample Data Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-download text-success me-2"></i>
+                    Sample Data Format
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Your data should follow this format. Download the sample file to see the exact structure:
+                </p>
+                
+                <div class="table-responsive mb-3">
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tanggal</th>
+                                <th>Indikator_Harga</th>
+                                <th>Bulan (optional)</th>
+                                <th>Minggu (optional)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2024-01-07</td>
+                                <td>1.25</td>
+                                <td>Januari '24</td>
+                                <td>M1</td>
+                            </tr>
+                            <tr>
+                                <td>2024-01-14</td>
+                                <td>-0.85</td>
+                                <td>Januari '24</td>
+                                <td>M2</td>
+                            </tr>
+                            <tr>
+                                <td>2024-01-21</td>
+                                <td>2.10</td>
+                                <td>Januari '24</td>
+                                <td>M3</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <button class="btn btn-outline-success" onclick="downloadSampleData()">
+                    <i class="fas fa-download me-2"></i>
+                    Download Sample CSV
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Upload page specific JavaScript
+class UploadHandler {
+    constructor() {
+        this.selectedFile = null;
+        this.init();
+    }
+    
+    init() {
+        console.log('📁 Upload handler initialized');
+        this.setupEventListeners();
+    }
+    
+    setupEventListeners() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+        
+        // Drag and drop events
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFileSelection(files[0]);
+            }
+        });
+        
+        // Click to upload
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileSelection(e.target.files[0]);
+            }
+        });
+        
+        // Form submission
+        uploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleUpload();
+        });
+    }
+    
+    handleFileSelection(file) {
+        console.log('📄 File selected:', file.name);
+        
+        // Validate file
+        if (!this.validateFile(file)) {
+            return;
+        }
+        
+        this.selectedFile = file;
+        this.showFilePreview(file);
+        this.enableUploadButton();
+    }
+    
+    validateFile(file) {
+        // Check file type
+        const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.xlsx')) {
+            this.showAlert('Please select a CSV or Excel file.', 'warning');
+            return false;
+        }
+        
+        // Check file size (16MB)
+        if (file.size > 16 * 1024 * 1024) {
+            this.showAlert('File size must be less than 16MB.', 'warning');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    showFilePreview(file) {
+        const fileInfo = document.getElementById('fileInfo');
+        const filePreview = document.getElementById('filePreview');
+        
+        // Show file info
+        const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+        fileInfo.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <strong><i class="fas fa-file me-2"></i>Filename:</strong> ${file.name}
+                </div>
+                <div class="col-md-3">
+                    <strong><i class="fas fa-weight me-2"></i>Size:</strong> ${sizeInMB} MB
+                </div>
+                <div class="col-md-3">
+                    <strong><i class="fas fa-clock me-2"></i>Modified:</strong> ${new Date(file.lastModified).toLocaleDateString()}
+                </div>
+            </div>
+        `;
+        
+        // Show preview section
+        filePreview.style.display = 'block';
+        
+        // Try to preview CSV content
+        if (file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv')) {
+            this.previewCSV(file);
+        }
+    }
+    
+    previewCSV(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const csv = e.target.result;
+            const lines = csv.split('\n').slice(0, 6); // First 5 lines + header
+            
+            if (lines.length > 1) {
+                const previewTable = document.getElementById('previewTable');
+                let tableHTML = '<table class="table table-striped table-sm"><thead class="table-dark"><tr>';
+                
+                // Header
+                const headers = lines[0].split(',');
+                headers.forEach(header => {
+                    tableHTML += `<th>${header.trim()}</th>`;
+                });
+                tableHTML += '</tr></thead><tbody>';
+                
+                // Data rows
+                for (let i = 1; i < Math.min(lines.length, 6); i++) {
+                    if (lines[i].trim()) {
+                        tableHTML += '<tr>';
+                        const cells = lines[i].split(',');
+                        cells.forEach(cell => {
+                            tableHTML += `<td>${cell.trim()}</td>`;
+                        });
+                        tableHTML += '</tr>';
+                    }
+                }
+                
+                tableHTML += '</tbody></table>';
+                tableHTML += '<small class="text-muted">Showing first 5 rows of data</small>';
+                previewTable.innerHTML = tableHTML;
+            }
+        };
+        reader.readAsText(file);
+    }
+    
+    enableUploadButton() {
+        const uploadBtn = document.getElementById('uploadBtn');
+        uploadBtn.disabled = false;
+        uploadBtn.classList.add('pulse');
+    }
+    
+    async handleUpload() {
+        if (!this.selectedFile) {
+            this.showAlert('Please select a file first.', 'warning');
+            return;
+        }
+        
+        console.log('🚀 Starting upload process...');
+        
+        // Show progress
+        this.showProgress();
+        
+        try {
+            const formData = new FormData();
+            formData.append('file', this.selectedFile);
+            formData.append('forecast_weeks', document.getElementById('forecastWeeks').value);
+            
+            // Update progress
+            this.updateProgress(25, 'Uploading file...');
+            
+            const response = await fetch('/api/upload-data', {
+                method: 'POST',
+                body: formData
+            });
+            
+            this.updateProgress(50, 'Processing data...');
+            
+            const result = await response.json();
+            
+            this.updateProgress(75, 'Training models...');
+            
+            // Simulate processing time
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.updateProgress(100, 'Complete!');
+            
+            if (result.success) {
+                this.showUploadSuccess(result);
+            } else {
+                this.showUploadError(result.error || result.message);
+            }
+            
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showUploadError(`Upload failed: ${error.message}`);
+        } finally {
+            setTimeout(() => {
+                this.hideProgress();
+            }, 2000);
+        }
+    }
+    
+    showProgress() {
+        document.getElementById('uploadProgress').style.display = 'block';
+        document.getElementById('uploadBtn').disabled = true;
+    }
+    
+    updateProgress(percent, text) {
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('progressText').textContent = text;
+    }
+    
+    hideProgress() {
+        document.getElementById('uploadProgress').style.display = 'none';
+        document.getElementById('uploadBtn').disabled = false;
+    }
+    
+    showUploadSuccess(result) {
+        const resultsDiv = document.getElementById('uploadResults');
+        const html = `
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Upload Successful!
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="text-primary">${result.data_processing.merge_info.total_records}</h4>
+                                        <small class="text-muted">Total Records</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="text-success">${result.best_model.name}</h4>
+                                        <small class="text-muted">Best Model</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <h4 class="text-info">${result.forecast.weeks_forecasted}</h4>
+                                        <small class="text-muted">Weeks Forecasted</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                                    <i class="fas fa-tachometer-alt me-2"></i>
+                                    View Dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        resultsDiv.innerHTML = html;
+        
+        // Scroll to results
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    showUploadError(error) {
+        const resultsDiv = document.getElementById('uploadResults');
+        const html = `
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                Upload Failed
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-3">${error}</p>
+                            <button class="btn btn-outline-primary" onclick="location.reload()">
+                                <i class="fas fa-redo me-2"></i>
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    showAlert(message, type) {
+        // Use the dashboard's alert system if available
+        if (window.dashboard) {
+            window.dashboard.showAlert(message, type);
+        } else {
+            alert(message);
+        }
+    }
+}
+
+// Download sample data function
+function downloadSampleData() {
+    const sampleData = `Tanggal,Indikator_Harga,Bulan,Minggu
+2024-01-07,1.25,Januari '24,M1
+2024-01-14,-0.85,Januari '24,M2
+2024-01-21,2.10,Januari '24,M3
+2024-01-28,0.45,Januari '24,M4
+2024-02-04,-1.20,Februari '24,M1
+2024-02-11,3.15,Februari '24,M2
+2024-02-18,0.75,Februari '24,M3
+2024-02-25,-0.95,Februari '24,M4`;
+    
+    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_iph_data.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Initialize upload handler
+document.addEventListener('DOMContentLoaded', function() {
+    window.uploadHandler = new UploadHandler();
+    console.log('✅ Upload page initialized');
+});
+</script>
+
+<style>
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+</style>
+{% endblock %}

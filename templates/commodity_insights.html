@@ -1,0 +1,518 @@
+<!-- templates/commodity_insights.html -->
+{% extends "base.html" %}
+
+{% block title %}Commodity Insights - IPH Forecasting{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
+    <div>
+        <h1 class="h2 text-gradient mb-1">
+            <i class="fas fa-wheat-awn me-2"></i>
+            Commodity Insights
+        </h1>
+        <p class="text-muted mb-0">Analisis dampak komoditas terhadap perubahan harga</p>
+    </div>
+    <div class="btn-toolbar">
+        <button type="button" class="btn btn-success me-2" onclick="showUploadCommodityModal()">
+            <i class="fas fa-upload me-1"></i>
+            Upload Data Komoditas
+        </button>
+        <button type="button" class="btn btn-primary" onclick="refreshInsights()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Current Week Insights -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-week me-2"></i>
+                    Insight Minggu Ini
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="currentWeekInsights">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Analysis & Trends -->
+<div class="row g-4 mb-4">
+    <!-- Monthly Analysis -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar text-info me-2"></i>
+                    Analisis Bulanan
+                </h5>
+                <select class="form-select form-select-sm" id="monthSelector" style="width: auto;">
+                    <option value="">Bulan Terkini</option>
+                    <option value="Januari">Januari</option>
+                    <option value="Februari">Februari</option>
+                    <option value="Maret">Maret</option>
+                    <option value="April">April</option>
+                    <option value="Mei">Mei</option>
+                    <option value="Juni">Juni</option>
+                    <option value="Juli">Juli</option>
+                    <option value="Agustus">Agustus</option>
+                    <option value="September">September</option>
+                    <option value="Oktober">Oktober</option>
+                    <option value="November">November</option>
+                    <option value="Desember">Desember</option>
+                </select>
+            </div>
+            <div class="card-body">
+                <div id="monthlyAnalysis">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Commodity Trends -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-trending-up text-success me-2"></i>
+                    Trend Komoditas (4 Minggu Terakhir)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="commodityTrends">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Volatility Alerts -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Peringatan Volatilitas Komoditas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="volatilityAlerts">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Seasonal Patterns -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-alt text-purple me-2"></i>
+                    Pola Seasonal Komoditas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="seasonalPatterns">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-purple" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadCommodityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-upload me-2"></i>
+                    Upload Data Komoditas
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadCommodityForm">
+                    <div class="mb-3">
+                        <label for="commodityFile" class="form-label">Pilih File CSV/Excel</label>
+                        <input type="file" class="form-control" id="commodityFile" accept=".csv,.xlsx" required>
+                        <div class="form-text">
+                            Format: Bulan, Minggu ke-, Kab/Kota, IPH (%), Komoditas Andil, Komoditas Fluktuasi, Nilai Fluktuasi
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-success" onclick="uploadCommodityData()">
+                    <i class="fas fa-upload me-1"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load current week insights
+async function loadCurrentWeekInsights() {
+    try {
+        const response = await fetch('/api/commodity/current-week');
+        const data = await response.json();
+        
+        const container = document.getElementById('currentWeekInsights');
+        
+        if (data.success) {
+            let html = `
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="alert alert-${data.iph_value > 0 ? 'warning' : 'info'} mb-3">
+                            <h6 class="alert-heading">
+                                ${data.iph_value > 0 ? '📈' : '📉'} 
+                                ${data.period.bulan} ${data.period.minggu} - ${data.period.kota}
+                            </h6>
+                            <p class="mb-0">${data.summary}</p>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-success">Komoditas Pendorong Inflasi:</h6>
+                                <ul class="list-unstyled">
+                                    ${data.top_positive_impacts.map(c => 
+                                        `<li><i class="fas fa-arrow-up text-success me-2"></i>
+                                        ${c.name}: <strong>+${c.impact.toFixed(3)}%</strong></li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-danger">Komoditas Penekan Inflasi:</h6>
+                                <ul class="list-unstyled">
+                                    ${data.top_negative_impacts.map(c => 
+                                        `<li><i class="fas fa-arrow-down text-danger me-2"></i>
+                                        ${c.name}: <strong>${c.impact.toFixed(3)}%</strong></li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">IPH Minggu Ini</h5>
+                                <h2 class="${data.iph_value > 0 ? 'text-warning' : 'text-info'}">
+                                    ${data.iph_value.toFixed(2)}%
+                                </h2>
+                                <hr>
+                                <small class="text-muted">Komoditas Paling Volatile:</small>
+                                <p class="mb-0"><strong>${data.most_volatile}</strong></p>
+                                <p class="text-danger">${(data.volatility_value * 100).toFixed(2)}% fluktuasi</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${data.message || 'No data available'}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading current week insights:', error);
+    }
+}
+
+// Load monthly analysis
+async function loadMonthlyAnalysis(month = null) {
+    try {
+        const url = month ? `/api/commodity/monthly-analysis?month=${month}` : '/api/commodity/monthly-analysis';
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const container = document.getElementById('monthlyAnalysis');
+        
+        if (data.success) {
+            let html = `
+                <h6 class="mb-3">${data.month} - ${data.weeks_analyzed} Minggu Data</h6>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Rata-rata IPH:</span>
+                        <span class="badge ${data.avg_iph > 0 ? 'bg-warning' : 'bg-info'} fs-6">
+                            ${data.avg_iph.toFixed(2)}% ${data.iph_trend}
+                        </span>
+                    </div>
+                </div>
+                <h6 class="mb-2">Top Komoditas Berpengaruh:</h6>
+                <div class="list-group mb-3">
+                    ${data.top_impact_commodities.slice(0, 3).map(c => `
+                        <div class="list-group-item py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>${c.name}</span>
+                                <div>
+                                    <span class="badge bg-primary">${c.total_impact.toFixed(3)}%</span>
+                                    <span class="badge bg-secondary">${c.frequency}x</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="alert alert-light">
+                    <small>${data.monthly_summary ? data.monthly_summary : 'Tidak ada data bulanan.'}</small>
+                </div>
+            `;
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading monthly analysis:', error);
+    }
+}
+
+// Load commodity trends
+async function loadCommodityTrends() {
+    try {
+        const response = await fetch('/api/commodity/trends?periods=4');
+        const data = await response.json();
+        
+        const container = document.getElementById('commodityTrends');
+        
+        if (data.success && Object.keys(data.commodity_trends).length > 0) {
+            const trends = Object.entries(data.commodity_trends).slice(0, 5);
+            
+            let html = '<div class="list-group">';
+            
+            trends.forEach(([name, info]) => {
+                const trendIcon = info.trend === 'increasing' ? '📈' : 
+                                 info.trend === 'decreasing' ? '📉' : '➡️';
+                const trendColor = info.trend === 'increasing' ? 'danger' : 
+                                   info.trend === 'decreasing' ? 'success' : 'secondary';
+                
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">${name}</h6>
+                                <small class="text-muted">Muncul ${info.appearances}x dalam 4 minggu</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${trendColor}">
+                                    ${trendIcon} ${info.trend}
+                                </span>
+                                <div class="mt-1">
+                                    <small>Avg: ${(info.impacts.reduce((a,b) => a+b, 0) / info.impacts.length).toFixed(3)}%</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            html += `<div class="mt-3 text-muted"><small>${data.summary}</small></div>`;
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div class="alert alert-warning">${data.message ? data.message : 'Tidak ada trend komoditas.'}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading commodity trends:', error);
+    }
+}
+
+// Load volatility alerts
+async function loadVolatilityAlerts() {
+    try {
+        const response = await fetch('/api/commodity/alerts?threshold=0.05');
+        const data = await response.json();
+        
+        const container = document.getElementById('volatilityAlerts');
+        
+        if (data.success && data.alerts.length > 0) {
+            let html = '<div class="row">';
+            
+            data.alerts.forEach(alert => {
+                const severityColor = alert.severity === 'high' ? 'danger' : 'warning';
+                
+                html += `
+                    <div class="col-md-6 mb-3">
+                        <div class="alert alert-${severityColor} mb-0">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                ${alert.commodity}
+                            </h6>
+                            <p class="mb-1">${alert.period}</p>
+                            <div class="d-flex justify-content-between">
+                                <span>Volatilitas: <strong>${(alert.volatility * 100).toFixed(2)}%</strong></span>
+                                <span>IPH: <strong>${alert.iph_impact.toFixed(2)}%</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            html += `<p class="text-muted mb-0">${data.summary}</p>`;
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Tidak ada komoditas dengan volatilitas tinggi (> 5%)
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading volatility alerts:', error);
+    }
+}
+
+// Load seasonal patterns
+async function loadSeasonalPatterns() {
+    try {
+        const response = await fetch('/api/commodity/seasonal');
+        const data = await response.json();
+        
+        const container = document.getElementById('seasonalPatterns');
+        
+        if (data.success) {
+            let html = '<div class="row">';
+            
+            Object.entries(data.seasonal_patterns).forEach(([month, pattern]) => {
+                const trendColor = pattern.avg_iph > 0 ? 'warning' : 'info';
+                
+                html += `
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-header bg-${trendColor} text-white">
+                                <h6 class="mb-0">${month}</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-3">
+                                    <h4 class="${pattern.avg_iph > 0 ? 'text-warning' : 'text-info'}">
+                                        ${pattern.avg_iph.toFixed(2)}%
+                                    </h4>
+                                    <small class="text-muted">Rata-rata IPH</small>
+                                </div>
+                                <h6 class="small">Komoditas Dominan:</h6>
+                                <ul class="list-unstyled small">
+                                    ${pattern.dominant_commodities.slice(0, 2).map(c => 
+                                        `<li>${c.name} (${c.avg_impact.toFixed(3)}%)</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            html += `<div class="alert alert-light mt-3"><small>${data.summary}</small></div>`;
+            
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = `<div class="alert alert-warning">${data.message}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading seasonal patterns:', error);
+    }
+}
+
+// Upload commodity data
+async function uploadCommodityData() {
+    const fileInput = document.getElementById('commodityFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/commodity/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Success! ${result.records} records uploaded.`);
+            bootstrap.Modal.getInstance(document.getElementById('uploadCommodityModal')).hide();
+            refreshInsights();
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    } catch (error) {
+        alert(`Upload failed: ${error.message}`);
+    }
+}
+
+// Show upload modal
+function showUploadCommodityModal() {
+    const modal = new bootstrap.Modal(document.getElementById('uploadCommodityModal'));
+    modal.show();
+}
+
+// Refresh all insights
+function refreshInsights() {
+    loadCurrentWeekInsights();
+    loadMonthlyAnalysis();
+    loadCommodityTrends();
+    loadVolatilityAlerts();
+    loadSeasonalPatterns();
+}
+
+// Month selector change
+document.getElementById('monthSelector')?.addEventListener('change', (e) => {
+    loadMonthlyAnalysis(e.target.value);
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshInsights();
+});
+</script>
+{% endblock %}

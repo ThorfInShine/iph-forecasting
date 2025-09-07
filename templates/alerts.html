@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block title %}Sistem Peringatan - IPH Forecasting{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
+    <div>
+        <h1 class="h2 text-gradient mb-1">
+            <i class="fas fa-bell me-2"></i>
+            Sistem Peringatan Cerdas
+        </h1>
+        <p class="text-muted mb-0">Monitoring otomatis perubahan harga dan anomali data</p>
+    </div>
+    <div class="btn-toolbar">
+        <button type="button" class="btn btn-success me-2" onclick="showCreateAlertModal()">
+            <i class="fas fa-plus me-1"></i>
+            Buat Peringatan Baru
+        </button>
+        <button type="button" class="btn btn-outline-primary" onclick="refreshAlerts()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Alert Statistics -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Peringatan Kritis</h6>
+                        <h3 class="mb-0" id="criticalCount">0</h3>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Peringatan Sedang</h6>
+                        <h3 class="mb-0" id="warningCount">0</h3>
+                    </div>
+                    <i class="fas fa-exclamation-circle fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Informasi</h6>
+                        <h3 class="mb-0" id="infoCount">0</h3>
+                    </div>
+                    <i class="fas fa-info-circle fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white-50">Aturan Aktif</h6>
+                        <h3 class="mb-0" id="activeRulesCount">0</h3>
+                    </div>
+                    <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Rules Configuration -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs text-primary me-2"></i>
+                    Aturan Peringatan Aktif
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group" id="alertRulesList">
+                    <!-- Threshold Alert -->
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-chart-line text-danger me-2"></i>
+                                    Peringatan Threshold
+                                </h6>
+                                <p class="mb-1 text-muted">IPH > 3% atau < -3%</p>
+                                <small>Terakhir dipicu: 2 jam yang lalu</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="thresholdAlert" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trend Alert -->
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-exchange-alt text-warning me-2"></i>
+                                    Deteksi Perubahan Trend
+                                </h6>
+                                <p class="mb-1 text-muted">Pembalikan trend signifikan</p>
+                                <small>Terakhir dipicu: 1 hari yang lalu</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="trendAlert" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Volatility Alert -->
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-bolt text-info me-2"></i>
+                                    Lonjakan Volatilitas
+                                </h6>
+                                <p class="mb-1 text-muted">Pergerakan harga tidak wajar</p>
+                                <small>Terakhir dipicu: 3 hari yang lalu</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="volatilityAlert" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Data Quality Alert -->
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-database text-secondary me-2"></i>
+                                    Kualitas Data
+                                </h6>
+                                <p class="mb-1 text-muted">Data hilang atau outlier</p>
+                                <small>Terakhir dipicu: Tidak pernah</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="dataQualityAlert" checked>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Model Performance Alert -->
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="fas fa-robot text-purple me-2"></i>
+                                    Performa Model
+                                </h6>
+                                <p class="mb-1 text-muted">Degradasi akurasi model</p>
+                                <small>Terakhir dipicu: 5 hari yang lalu</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="modelAlert">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bell text-warning me-2"></i>
+                    Peringatan Terkini
+                </h5>
+                <span class="badge bg-danger" id="newAlertsCount">3 Baru</span>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                <div id="recentAlertsList">
+                    <!-- Recent alerts will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert History Chart -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history text-info me-2"></i>
+                    Riwayat Peringatan (7 Hari Terakhir)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="alertHistoryChart" style="height: 300px;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Memuat riwayat peringatan...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Alert Modal -->
+<div class="modal fade" id="createAlertModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>
+                    Buat Aturan Peringatan Baru
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createAlertForm">
+                    <div class="mb-3">
+                        <label for="alertName" class="form-label">Nama Peringatan</label>
+                        <input type="text" class="form-control" id="alertName" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="alertType" class="form-label">Tipe Peringatan</label>
+                        <select class="form-select" id="alertType" required>
+                            <option value="">Pilih tipe...</option>
+                            <option value="threshold">Threshold (Batas Nilai)</option>
+                            <option value="trend">Perubahan Trend</option>
+                            <option value="volatility">Lonjakan Volatilitas</option>
+                            <option value="pattern">Pola Tertentu</option>
+                        </select>
+                    </div>
+                    
+                    <div id="thresholdConfig" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="upperThreshold" class="form-label">Batas Atas (%)</label>
+                                    <input type="number" step="0.1" class="form-control" id="upperThreshold">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="lowerThreshold" class="form-label">Batas Bawah (%)</label>
+                                    <input type="number" step="0.1" class="form-control" id="lowerThreshold">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="alertPriority" class="form-label">Prioritas</label>
+                        <select class="form-select" id="alertPriority" required>
+                            <option value="low">Rendah</option>
+                            <option value="medium">Sedang</option>
+                            <option value="high">Tinggi</option>
+                            <option value="critical">Kritis</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="alertDescription" class="form-label">Deskripsi</label>
+                        <textarea class="form-control" id="alertDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="emailNotification">
+                        <label class="form-check-label" for="emailNotification">
+                            Kirim notifikasi email
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-success" onclick="saveAlertRule()">
+                    <i class="fas fa-save me-1"></i>
+                    Simpan Aturan
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Alert system JavaScript
+let alertRules = [];
+let recentAlerts = [];
+
+async function loadAlertRules() {
+    try {
+        const response = await fetch('/api/alerts/rules');
+        const data = await response.json();
+        
+        if (data.success) {
+            alertRules = data.rules;
+            updateAlertRulesList();
+            updateAlertStatistics(data.statistics);
+        }
+    } catch (error) {
+        console.error('Error loading alert rules:', error);
+    }
+}
+
+async function loadRecentAlerts() {
+    try {
+        const response = await fetch('/api/alerts/recent');
+        const data = await response.json();
+        
+        if (data.success) {
+            recentAlerts = data.alerts;
+            displayRecentAlerts();
+        }
+    } catch (error) {
+        console.error('Error loading recent alerts:', error);
+    }
+}
+
+async function loadAlertHistory() {
+    try {
+        const response = await fetch('/api/alerts/history?days=7');
+        const data = await response.json();
+        
+        const chartDiv = document.getElementById('alertHistoryChart');
+        
+        if (!data.success || !data.alerts || data.alerts.length === 0) {
+            chartDiv.innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-bell-slash fa-3x mb-3"></i>
+                    <p class="mb-2">No recent alerts found</p>
+                    <small>Historical alerts will appear here when thresholds are exceeded</small>
+                </div>
+            `;
+            return;
+        }
+        
+        // Display as list of historical alerts instead of chart
+        let alertsHtml = '<div class="list-group">';
+        
+        data.alerts.forEach(alert => {
+            const severityClass = {
+                'critical': 'list-group-item-danger',
+                'warning': 'list-group-item-warning',
+                'info': 'list-group-item-info'
+            }[alert.severity] || 'list-group-item-light';
+            
+            const icon = {
+                'critical': 'fa-exclamation-triangle text-danger',
+                'warning': 'fa-exclamation-circle text-warning',
+                'info': 'fa-info-circle text-info'
+            }[alert.severity] || 'fa-bell text-muted';
+            
+            const timeAgo = alert.days_ago === 0 ? 'Today' : 
+                          alert.days_ago === 1 ? 'Yesterday' : 
+                          `${alert.days_ago} days ago`;
+            
+            alertsHtml += `
+                <div class="list-group-item ${severityClass} ${alert.acknowledged ? 'opacity-75' : ''}">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div class="d-flex align-items-start">
+                            <i class="fas ${icon} me-3 mt-1"></i>
+                            <div>
+                                <h6 class="mb-1">${alert.title}</h6>
+                                <p class="mb-1">${alert.message}</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>
+                                    ${timeAgo} • Value: ${alert.value.toFixed(3)}%
+                                </small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            ${alert.acknowledged ? 
+                                '<span class="badge bg-secondary">Acknowledged</span>' : 
+                                '<span class="badge bg-primary">New</span>'
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        alertsHtml += '</div>';
+        
+        if (data.total_alerts > data.alerts.length) {
+            alertsHtml += `
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        Showing ${data.alerts.length} of ${data.total_alerts} total alerts
+                    </small>
+                </div>
+            `;
+        }
+        
+        chartDiv.innerHTML = alertsHtml;
+        
+    } catch (error) {
+        console.error('Error loading alert history:', error);
+        document.getElementById('alertHistoryChart').innerHTML = `
+            <div class="alert alert-danger m-3">
+                <i class="fas fa-times-circle me-2"></i>
+                Error loading alert history: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayRecentAlerts() {
+    const container = document.getElementById('recentAlertsList');
+    
+    if (recentAlerts.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-bell-slash fa-3x mb-3"></i>
+                <p>Tidak ada peringatan terkini</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    recentAlerts.forEach(alert => {
+        const priorityClass = {
+            'critical': 'danger',
+            'high': 'warning',
+            'medium': 'info',
+            'low': 'secondary'
+        }[alert.priority] || 'secondary';
+        
+        const icon = {
+            'threshold': 'fa-chart-line',
+            'trend': 'fa-exchange-alt',
+            'volatility': 'fa-bolt',
+            'data_quality': 'fa-database',
+            'model': 'fa-robot'
+        }[alert.type] || 'fa-bell';
+        
+        html += `
+            <div class="alert alert-${priorityClass} alert-dismissible fade show" role="alert">
+                <div class="d-flex align-items-start">
+                    <i class="fas ${icon} me-3 mt-1"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">${alert.title}</h6>
+                        <p class="mb-1">${alert.message}</p>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            ${new Date(alert.timestamp).toLocaleString('id-ID')}
+                        </small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function updateAlertStatistics(stats) {
+    document.getElementById('criticalCount').textContent = stats.critical || 0;
+    document.getElementById('warningCount').textContent = stats.warning || 0;
+    document.getElementById('infoCount').textContent = stats.info || 0;
+    document.getElementById('activeRulesCount').textContent = stats.activeRules || 0;
+    document.getElementById('newAlertsCount').textContent = `${stats.newAlerts || 0} Baru`;
+}
+
+function showCreateAlertModal() {
+    const modal = new bootstrap.Modal(document.getElementById('createAlertModal'));
+    modal.show();
+}
+
+document.getElementById('alertType')?.addEventListener('change', function(e) {
+    const thresholdConfig = document.getElementById('thresholdConfig');
+    if (e.target.value === 'threshold') {
+        thresholdConfig.style.display = 'block';
+    } else {
+        thresholdConfig.style.display = 'none';
+    }
+});
+
+async function saveAlertRule() {
+    const formData = {
+        name: document.getElementById('alertName').value,
+        type: document.getElementById('alertType').value,
+        priority: document.getElementById('alertPriority').value,
+        description: document.getElementById('alertDescription').value,
+        emailNotification: document.getElementById('emailNotification').checked
+    };
+    
+    if (formData.type === 'threshold') {
+        formData.upperThreshold = parseFloat(document.getElementById('upperThreshold').value);
+        formData.lowerThreshold = parseFloat(document.getElementById('lowerThreshold').value);
+    }
+    
+    try {
+        const response = await fetch('/api/alerts/rules', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('createAlertModal')).hide();
+            showAlert('Aturan peringatan berhasil dibuat!', 'success');
+            loadAlertRules();
+        } else {
+            showAlert('Gagal membuat aturan: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        showAlert('Error: ' + error.message, 'danger');
+    }
+}
+
+function refreshAlerts() {
+    loadAlertRules();
+    loadRecentAlerts();
+    loadAlertHistory();
+    showAlert('Data peringatan diperbarui!', 'info');
+}
+
+function showAlert(message, type) {
+    const alertHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; max-width: 400px;" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHTML);
+    
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.textContent.includes(message.substring(0, 20))) {
+                alert.remove();
+            }
+        });
+    }, 5000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAlertRules();
+    loadRecentAlerts();
+    loadAlertHistory();
+    
+    // Auto-refresh every 30 seconds
+    setInterval(() => {
+        loadRecentAlerts();
+    }, 30000);
+});
+</script>
+{% endblock %}

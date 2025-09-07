@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block title %}Visualisasi Data - IPH Forecasting{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
+    <div>
+        <h1 class="h2 text-gradient mb-1">
+            <i class="fas fa-chart-area me-2"></i>
+            Visualisasi Data IPH
+        </h1>
+        <p class="text-muted mb-0">Analisis mendalam data Indikator Perubahan Harga</p>
+    </div>
+    <div class="btn-toolbar">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-outline-primary active" onclick="changeTimeframe('6M')">6 Bulan</button>
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('1Y')">1 Tahun</button>
+            <button type="button" class="btn btn-outline-primary" onclick="changeTimeframe('ALL')">Semua</button>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="refreshVisualization()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Visualization Tabs -->
+<ul class="nav nav-tabs mb-4" id="vizTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="decomposition-tab" data-bs-toggle="tab" data-bs-target="#decomposition" type="button">
+            <i class="fas fa-layer-group me-1"></i>
+            Dekomposisi Time Series
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="moving-avg-tab" data-bs-toggle="tab" data-bs-target="#moving-avg" type="button">
+            <i class="fas fa-chart-line me-1"></i>
+            Moving Averages
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="volatility-tab" data-bs-toggle="tab" data-bs-target="#volatility" type="button">
+            <i class="fas fa-chart-bar me-1"></i>
+            Analisis Volatilitas
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="distribution-tab" data-bs-toggle="tab" data-bs-target="#distribution" type="button">
+            <i class="fas fa-chart-pie me-1"></i>
+            Distribusi Perubahan
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="aggregation-tab" data-bs-toggle="tab" data-bs-target="#aggregation" type="button">
+            <i class="fas fa-calendar-alt me-1"></i>
+            Agregasi Periode
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content" id="vizTabContent">
+    <!-- Time Series Decomposition -->
+    <div class="tab-pane fade show active" id="decomposition" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-layer-group text-primary me-2"></i>
+                            Dekomposisi Time Series (Trend + Seasonal + Residual)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="decompositionChart" style="height: 600px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Memuat dekomposisi time series...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Moving Averages -->
+    <div class="tab-pane fade" id="moving-avg" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-line text-success me-2"></i>
+                            Moving Averages Analysis
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary active" onclick="toggleMA('SMA')">SMA</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('EMA')">EMA</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleMA('WMA')">WMA</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="movingAvgChart" style="height: 500px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Memuat analisis moving averages...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volatility Analysis -->
+    <div class="tab-pane fade" id="volatility" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar text-warning me-2"></i>
+                            Analisis Volatilitas (Rolling Standard Deviation)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div id="volatilityChart" style="height: 400px;">
+                                    <div class="text-center py-5">
+                                        <div class="spinner-border text-warning" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Menghitung volatilitas...</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Statistik Volatilitas</h6>
+                                        <div id="volatilityStats">
+                                            <div class="mb-3">
+                                                <small class="text-muted">Volatilitas Saat Ini</small>
+                                                <h4 class="text-warning" id="currentVolatility">-</h4>
+                                            </div>
+                                            <div class="mb-3">
+                                                <small class="text-muted">Rata-rata 30 Hari</small>
+                                                <h5 id="avgVolatility30">-</h5>
+                                            </div>
+                                            <div class="mb-3">
+                                                <small class="text-muted">Volatilitas Maksimum</small>
+                                                <h5 class="text-danger" id="maxVolatility">-</h5>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Volatilitas Minimum</small>
+                                                <h5 class="text-success" id="minVolatility">-</h5>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price Change Distribution -->
+    <div class="tab-pane fade" id="distribution" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie text-info me-2"></i>
+                            Distribusi Perubahan Harga
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="distributionChart" style="height: 400px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar text-purple me-2"></i>
+                            Histogram Perubahan
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="histogramChart" style="height: 400px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-purple" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly/Quarterly Aggregation -->
+    <div class="tab-pane fade" id="aggregation" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-calendar-alt text-secondary me-2"></i>
+                            Agregasi Bulanan & Kuartalan
+                        </h5>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary active" onclick="changeAggregation('monthly')">Bulanan</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="changeAggregation('quarterly')">Kuartalan</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="changeAggregation('yearly')">Tahunan</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="aggregationChart" style="height: 450px;">
+                            <div class="text-center py-5">
+                                <div class="spinner-border text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Menghitung agregasi data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Visualization page JavaScript
+    let currentTimeframe = '6M';
+    let currentAggregation = 'monthly';
+    
+    async function loadDecomposition() {
+        console.log('Loading decomposition...');
+        try {
+            const response = await fetch(`/api/visualization/decomposition?timeframe=${currentTimeframe}`);
+            const data = await response.json();
+            
+            console.log('Decomposition response:', data);
+            
+            if (data.success) {
+                // Clear loading spinner
+                document.getElementById('decompositionChart').innerHTML = '';
+                
+                // Create plot using the chart data directly
+                Plotly.newPlot('decompositionChart', data.chart.data, data.chart.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+            } else {
+                document.getElementById('decompositionChart').innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Gagal memuat data'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading decomposition:', error);
+            document.getElementById('decompositionChart').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    async function loadMovingAverages() {
+        console.log('Loading moving averages...');
+        try {
+            const response = await fetch(`/api/visualization/moving-averages?timeframe=${currentTimeframe}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            console.log('Moving averages response:', data);
+            
+            const chartDiv = document.getElementById('movingAvgChart');
+            
+            if (data.success && data.chart) {
+                // Clear loading spinner
+                chartDiv.innerHTML = '';
+                
+                // Create plot directly with data structure
+                Plotly.newPlot('movingAvgChart', data.chart.data, data.chart.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+                
+                console.log('✅ Moving averages chart loaded successfully');
+            } else {
+                chartDiv.innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Gagal memuat data moving averages'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading moving averages:', error);
+            document.getElementById('movingAvgChart').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Network Error: ${error.message}
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="loadMovingAverages()">
+                            <i class="fas fa-redo me-1"></i>Retry
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    async function loadVolatility() {
+        console.log('Loading volatility...');
+        try {
+            const response = await fetch(`/api/visualization/volatility?timeframe=${currentTimeframe}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('volatilityChart').innerHTML = '';
+                Plotly.newPlot('volatilityChart', data.chart.data, data.chart.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+                
+                // Update stats
+                if (data.stats) {
+                    document.getElementById('currentVolatility').textContent = data.stats.current.toFixed(3) + '%';
+                    document.getElementById('avgVolatility30').textContent = data.stats.avg30.toFixed(3) + '%';
+                    document.getElementById('maxVolatility').textContent = data.stats.max.toFixed(3) + '%';
+                    document.getElementById('minVolatility').textContent = data.stats.min.toFixed(3) + '%';
+                }
+            } else {
+                document.getElementById('volatilityChart').innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Gagal memuat data'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading volatility:', error);
+            document.getElementById('volatilityChart').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    async function loadDistribution() {
+        console.log('Loading distribution...');
+        try {
+            const response = await fetch(`/api/visualization/distribution?timeframe=${currentTimeframe}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('distributionChart').innerHTML = '';
+                document.getElementById('histogramChart').innerHTML = '';
+                
+                Plotly.newPlot('distributionChart', data.pieChart.data, data.pieChart.layout, {
+                    responsive: true,
+                    displayModeBar: false
+                });
+                
+                Plotly.newPlot('histogramChart', data.histogram.data, data.histogram.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+            } else {
+                const errorMsg = `
+                    <div class="alert alert-warning m-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Gagal memuat data'}
+                    </div>
+                `;
+                document.getElementById('distributionChart').innerHTML = errorMsg;
+                document.getElementById('histogramChart').innerHTML = errorMsg;
+            }
+        } catch (error) {
+            console.error('Error loading distribution:', error);
+            const errorMsg = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Error: ${error.message}
+                </div>
+            `;
+            document.getElementById('distributionChart').innerHTML = errorMsg;
+            document.getElementById('histogramChart').innerHTML = errorMsg;
+        }
+    }
+
+    async function loadAggregation() {
+        console.log('Loading aggregation...');
+        try {
+            const response = await fetch(`/api/visualization/aggregation?type=${currentAggregation}&timeframe=${currentTimeframe}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                document.getElementById('aggregationChart').innerHTML = '';
+                Plotly.newPlot('aggregationChart', data.chart.data, data.chart.layout, {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+                });
+            } else {
+                document.getElementById('aggregationChart').innerHTML = `
+                    <div class="alert alert-warning m-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Gagal memuat data'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading aggregation:', error);
+            document.getElementById('aggregationChart').innerHTML = `
+                <div class="alert alert-danger m-3">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    
+    function changeTimeframe(timeframe) {
+        currentTimeframe = timeframe;
+        
+        // Update button states
+        document.querySelectorAll('.btn-group button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Reload all charts
+        refreshVisualization();
+    }
+    
+    function changeAggregation(type) {
+        currentAggregation = type;
+        
+        // Update button states
+        event.target.parentElement.querySelectorAll('button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        loadAggregation();
+    }
+    
+    function toggleMA(type) {
+        // Toggle visibility of moving average types
+        const traces = document.getElementById('movingAvgChart')._fullData;
+        
+        if (traces) {
+            Plotly.restyle('movingAvgChart', {
+                visible: traces.map(trace => {
+                    if (trace.name.includes('IPH')) return true;
+                    if (type === 'SMA' && trace.name.includes('SMA')) return true;
+                    if (type === 'EMA' && trace.name.includes('EMA')) return true;
+                    if (type === 'WMA' && trace.name.includes('WMA')) return true;
+                    return false;
+                })
+            });
+        }
+        
+        // Update button states
+        event.target.parentElement.querySelectorAll('button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+    }
+    
+    function refreshVisualization() {
+        // Get active tab
+        const activeTab = document.querySelector('.tab-pane.active').id;
+        
+        switch(activeTab) {
+            case 'decomposition':
+                loadDecomposition();
+                break;
+            case 'moving-avg':
+                loadMovingAverages();
+                break;
+            case 'volatility':
+                loadVolatility();
+                break;
+            case 'distribution':
+                loadDistribution();
+                break;
+            case 'aggregation':
+                loadAggregation();
+                break;
+        }
+    }
+    
+    // Load initial data when tab changes
+    document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function (event) {
+            const targetId = event.target.getAttribute('data-bs-target').substring(1);
+            
+            switch(targetId) {
+                case 'decomposition':
+                    loadDecomposition();
+                    break;
+                case 'moving-avg':
+                    loadMovingAverages();
+                    break;
+                case 'volatility':
+                    loadVolatility();
+                    break;
+                case 'distribution':
+                    loadDistribution();
+                    break;
+                case 'aggregation':
+                    loadAggregation();
+                    break;
+            }
+        });
+    });
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Visualization page loaded');
+        loadDecomposition();
+    });
+    </script>
+{% endblock %}

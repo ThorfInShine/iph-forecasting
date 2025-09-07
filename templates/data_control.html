@@ -1,0 +1,741 @@
+{% extends "base.html" %}
+
+{% block title %}Data Control - IPH Forecasting{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-3 mb-4 border-bottom">
+    <div>
+        <h1 class="h2 text-gradient mb-1">
+            <i class="fas fa-database me-2"></i>
+            Data Control
+        </h1>
+        <p class="text-muted mb-0">Manage your IPH data and model training</p>
+    </div>
+    <div class="btn-toolbar">
+        <button type="button" class="btn btn-success me-2" onclick="showAddRecordModal()">
+            <i class="fas fa-plus me-1"></i>
+            Add Single Record
+        </button>
+        <button type="button" class="btn btn-warning me-2" onclick="retrainModels()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Retrain Models
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Data Quality Indicators -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie text-info me-2"></i>
+                    Data Quality Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <!-- Completeness -->
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="status-indicator status-success me-3"></div>
+                            <div>
+                                <h6 class="mb-1">Data Completeness</h6>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: 98.5%"></div>
+                                </div>
+                                <small class="text-muted">98.5% complete</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Accuracy -->
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="status-indicator status-success me-3"></div>
+                            <div>
+                                <h6 class="mb-1">Data Accuracy</h6>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-info" style="width: 94.2%"></div>
+                                </div>
+                                <small class="text-muted">94.2% accurate</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Outliers -->
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="status-indicator status-warning me-3"></div>
+                            <div>
+                                <h6 class="mb-1">Outlier Detection</h6>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" style="width: 15%"></div>
+                                </div>
+                                <small class="text-muted">3 outliers found</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Freshness -->
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="status-indicator status-success me-3"></div>
+                            <div>
+                                <h6 class="mb-1">Data Freshness</h6>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: 90%"></div>
+                                </div>
+                                <small class="text-muted">Updated 2h ago</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Recommendations -->
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb text-warning me-2"></i>
+                    Recommendations
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info border-0 py-2 mb-3">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-info-circle me-2 mt-1"></i>
+                        <div>
+                            <small><strong>Data Quality:</strong> Consider removing 3 outliers to improve model accuracy.</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-success border-0 py-2 mb-3">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-check-circle me-2 mt-1"></i>
+                        <div>
+                            <small><strong>Model Performance:</strong> Current model is performing well. No action needed.</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-warning border-0 py-2 mb-0">
+                    <div class="d-flex align-items-start">
+                        <i class="fas fa-clock me-2 mt-1"></i>
+                        <div>
+                            <small><strong>Next Action:</strong> Schedule retrain in 3 days for optimal performance.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Data File Section -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cloud-upload-alt text-primary me-2"></i>
+                    Upload Data File
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Upload Form -->
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <!-- Drag & Drop Area -->
+                    <div class="upload-area mb-4" id="uploadArea">
+                        <div class="text-center">
+                            <i class="fas fa-cloud-upload-alt fa-4x text-primary mb-3"></i>
+                            <h5>Drag & Drop your file here</h5>
+                            <p class="text-muted mb-3">or click to browse files</p>
+                            <button type="button" class="btn btn-primary" id="browseBtn">
+                                <i class="fas fa-folder-open me-2"></i>
+                                Choose File
+                            </button>
+                        </div>
+                        <input type="file" id="fileInput" name="file" accept=".csv,.xlsx" style="display: none;">
+                    </div>
+                    
+                    <!-- Upload Options -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="forecastWeeks" class="form-label">
+                                    <i class="fas fa-calendar-alt me-1"></i>
+                                    Forecast Weeks After Upload
+                                </label>
+                                <select class="form-select" id="forecastWeeks" name="forecast_weeks">
+                                    <option value="4">4 weeks</option>
+                                    <option value="6">6 weeks</option>
+                                    <option value="8" selected>8 weeks</option>
+                                    <option value="10">10 weeks</option>
+                                    <option value="12">12 weeks</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-cog me-1"></i>
+                                    Processing Options
+                                </label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="autoRetrain" checked>
+                                    <label class="form-check-label" for="autoRetrain">
+                                        Auto-retrain models after upload
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="generateForecast" checked>
+                                    <label class="form-check-label" for="generateForecast">
+                                        Generate forecast immediately
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Upload Button -->
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-success btn-lg" id="uploadBtn" disabled>
+                            <i class="fas fa-upload me-2"></i>
+                            Upload and Process Data
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historical Data Table dengan Pagination -->
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-table text-success me-2"></i>
+                    Historical IPH Data
+                </h5>
+                <div class="d-flex align-items-center">
+                    <span class="me-3">Show:</span>
+                    <select class="form-select form-select-sm me-3" id="recordsPerPage" style="width: auto;">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <button class="btn btn-outline-primary btn-sm me-2" onclick="refreshHistoricalData()">
+                        <i class="fas fa-sync-alt me-1"></i>Refresh
+                    </button>
+                    <span class="badge bg-info" id="totalRecordsBadge">{{ historical_records|length }} records</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if historical_records %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0" id="historicalDataTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th class="border-0 py-3">#</th>
+                                <th class="border-0 py-3">
+                                    <i class="fas fa-calendar me-2 text-muted"></i>Date
+                                </th>
+                                <th class="border-0 py-3">
+                                    <i class="fas fa-chart-line me-2 text-muted"></i>IPH Value (%)
+                                </th>
+                                <th class="border-0 py-3">
+                                    <i class="fas fa-info me-2 text-muted"></i>Status
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="historicalDataBody">
+                            <!-- Data akan dimuat via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted" id="paginationInfo">
+                                Showing 1 to 50 of {{ historical_records|length }} records
+                            </small>
+                        </div>
+                        <nav aria-label="Data pagination">
+                            <ul class="pagination pagination-sm mb-0" id="paginationControls">
+                                <!-- Pagination buttons akan dimuat via JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-database fa-3x mb-3 opacity-25"></i>
+                    <p class="mb-2">No historical data available</p>
+                    <small>Upload a CSV file or add records manually to get started</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Area -->
+<div id="uploadResults"></div>
+<div id="actionResults"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add single record modal
+function showAddRecordModal() {
+    const modalHTML = `
+        <div class="modal fade" id="addRecordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-plus me-2"></i>Add Single IPH Record
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="addRecordForm">
+                            <div class="mb-3">
+                                <label for="recordDate" class="form-label">
+                                    <i class="fas fa-calendar me-1"></i>Date
+                                </label>
+                                <input type="date" class="form-control" id="recordDate" required>
+                                <div class="form-text">Select the date for this IPH record</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="recordIPH" class="form-label">
+                                    <i class="fas fa-chart-line me-1"></i>IPH Value (%)
+                                </label>
+                                <input type="number" step="0.001" class="form-control" id="recordIPH" 
+                                       placeholder="e.g., 1.25 or -0.85" required>
+                                <div class="form-text">Enter the IPH value as percentage (positive for inflation, negative for deflation)</div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="addSingleRecord()">
+                            <i class="fas fa-plus me-1"></i>Add Record
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal
+    const existingModal = document.getElementById('addRecordModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addRecordModal'));
+    modal.show();
+}
+
+async function addSingleRecord() {
+    const date = document.getElementById('recordDate').value;
+    const iph = document.getElementById('recordIPH').value;
+    
+    if (!date || !iph) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    try {
+        showLoading('Adding record...');
+        
+        const response = await fetch('/api/add-single-record', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tanggal: date,
+                indikator_harga: parseFloat(iph)
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Record added successfully!', 'success');
+            
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addRecordModal'));
+            modal.hide();
+            
+            // Refresh page after 2 seconds
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            showAlert(`Error: ${result.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        showAlert(`Error adding record: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function retrainModels() {
+    if (!confirm('Are you sure you want to retrain all models? This may take a few minutes.')) {
+        return;
+    }
+    
+    try {
+        showLoading('Retraining models...');
+        
+        const response = await fetch('/api/retrain-models', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Models retrained successfully!', 'success');
+        } else {
+            showAlert(`Error: ${result.message}`, 'danger');
+        }
+        
+    } catch (error) {
+        showAlert(`Retrain failed: ${error.message}`, 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+function refreshHistoricalData() {
+    location.reload();
+}
+
+// Upload functionality (reuse from original upload page)
+class DataControlHandler {
+    constructor() {
+        this.selectedFile = null;
+        this.init();
+    }
+    
+    init() {
+        this.setupEventListeners();
+    }
+    
+    setupEventListeners() {
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadForm = document.getElementById('uploadForm');
+        const browseBtn = document.getElementById('browseBtn');
+        
+        if (!uploadArea || !fileInput || !uploadForm) return;
+        
+        // Drag and drop events
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFileSelection(files[0]);
+            }
+        });
+        
+        // Browse button
+        if (browseBtn) {
+            browseBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                fileInput.click();
+            });
+        }
+        
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileSelection(e.target.files[0]);
+            }
+        });
+        
+        // Form submission
+        uploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleUpload();
+        });
+    }
+    
+    handleFileSelection(file) {
+        this.selectedFile = file;
+        const uploadBtn = document.getElementById('uploadBtn');
+        if (uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = `Upload ${file.name}`;
+        }
+    }
+    
+    async handleUpload() {
+        if (!this.selectedFile) {
+            alert('Please select a file first');
+            return;
+        }
+        
+        try {
+            showLoading('Uploading and processing data...');
+            
+            const formData = new FormData();
+            formData.append('file', this.selectedFile);
+            formData.append('forecast_weeks', document.getElementById('forecastWeeks').value);
+            
+            const response = await fetch('/api/upload-data', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert('Data uploaded and processed successfully!', 'success');
+                setTimeout(() => location.reload(), 3000);
+            } else {
+                showAlert(`Upload failed: ${result.error || result.message}`, 'danger');
+            }
+            
+        } catch (error) {
+            showAlert(`Upload failed: ${error.message}`, 'danger');
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+class HistoricalDataPagination {
+    constructor() {
+        this.currentPage = 1;
+        this.recordsPerPage = 50;
+        this.totalRecords = {{ historical_records|length }};
+        this.data = {{ historical_records|tojson }};
+        this.init();
+    }
+    
+    init() {
+        this.setupEventListeners();
+        this.renderTable();
+        this.renderPagination();
+    }
+    
+    setupEventListeners() {
+        document.getElementById('recordsPerPage')?.addEventListener('change', (e) => {
+            this.recordsPerPage = parseInt(e.target.value);
+            this.currentPage = 1;
+            this.renderTable();
+            this.renderPagination();
+        });
+    }
+    
+    renderTable() {
+        const tbody = document.getElementById('historicalDataBody');
+        if (!tbody || !this.data) return;
+        
+        const startIndex = (this.currentPage - 1) * this.recordsPerPage;
+        const endIndex = startIndex + this.recordsPerPage;
+        const pageData = this.data.slice(startIndex, endIndex);
+        
+        let html = '';
+        pageData.forEach((record, index) => {
+            const globalIndex = startIndex + index + 1;
+            const date = new Date(record.Tanggal).toLocaleDateString('id-ID');
+            const value = parseFloat(record.Indikator_Harga);
+            
+            let statusBadge = '';
+            let statusText = '';
+            
+            if (value > 2) {
+                statusBadge = 'bg-danger';
+                statusText = 'High Inflation';
+            } else if (value > 0) {
+                statusBadge = 'bg-warning';
+                statusText = 'Inflation';
+            } else if (value < -2) {
+                statusBadge = 'bg-info';
+                statusText = 'High Deflation';
+            } else if (value < 0) {
+                statusBadge = 'bg-success';
+                statusText = 'Deflation';
+            } else {
+                statusBadge = 'bg-secondary';
+                statusText = 'Stable';
+            }
+            
+            html += `
+                <tr>
+                    <td class="py-3">${globalIndex}</td>
+                    <td class="py-3">
+                        <strong>${date}</strong>
+                    </td>
+                    <td class="py-3">
+                        <span class="badge ${statusBadge} fs-6">
+                            ${value.toFixed(3)}%
+                        </span>
+                    </td>
+                    <td class="py-3">
+                        <span class="badge ${statusBadge}">${statusText}</span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+        this.updatePaginationInfo();
+    }
+    
+    renderPagination() {
+        const totalPages = Math.ceil(this.totalRecords / this.recordsPerPage);
+        const pagination = document.getElementById('paginationControls');
+        if (!pagination) return;
+        
+        let html = '';
+        
+        // Previous button
+        html += `
+            <li class="page-item ${this.currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="historicalPagination.goToPage(${this.currentPage - 1})">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        `;
+        
+        // Page numbers
+        const startPage = Math.max(1, this.currentPage - 2);
+        const endPage = Math.min(totalPages, this.currentPage + 2);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            html += `
+                <li class="page-item ${i === this.currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="historicalPagination.goToPage(${i})">${i}</a>
+                </li>
+            `;
+        }
+        
+        // Next button
+        html += `
+            <li class="page-item ${this.currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="historicalPagination.goToPage(${this.currentPage + 1})">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        `;
+        
+        pagination.innerHTML = html;
+    }
+    
+    goToPage(page) {
+        const totalPages = Math.ceil(this.totalRecords / this.recordsPerPage);
+        if (page < 1 || page > totalPages) return;
+        
+        this.currentPage = page;
+        this.renderTable();
+        this.renderPagination();
+    }
+    
+    updatePaginationInfo() {
+        const info = document.getElementById('paginationInfo');
+        if (!info) return;
+        
+        const startRecord = (this.currentPage - 1) * this.recordsPerPage + 1;
+        const endRecord = Math.min(this.currentPage * this.recordsPerPage, this.totalRecords);
+        
+        info.textContent = `Showing ${startRecord} to ${endRecord} of ${this.totalRecords} records`;
+    }
+}
+
+// Initialize pagination
+let historicalPagination;
+document.addEventListener('DOMContentLoaded', function() {
+    if ({{ historical_records|length }} > 0) {
+        historicalPagination = new HistoricalDataPagination();
+    }
+});
+
+// Utility functions
+function showLoading(message) {
+    const loadingHTML = `
+        <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+             style="background-color: rgba(0,0,0,0.7); z-index: 9999;">
+            <div class="text-center text-white">
+                <div class="loading-spinner mb-3" style="width: 3rem; height: 3rem; border-width: 4px;"></div>
+                <h5>${message}</h5>
+            </div>
+        </div>
+    `;
+    
+    const existingOverlay = document.getElementById('loadingOverlay');
+    if (existingOverlay) existingOverlay.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', loadingHTML);
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.remove();
+}
+
+function showAlert(message, type) {
+    const alertHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; max-width: 400px;" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHTML);
+    
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.textContent.includes(message.substring(0, 20))) {
+                alert.remove();
+            }
+        });
+    }, 5000);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    window.dataControlHandler = new DataControlHandler();
+});
+</script>
+{% endblock %}

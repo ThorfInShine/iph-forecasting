@@ -1,0 +1,11 @@
+{
+  "existing_records": 166,
+  "new_records": 112,
+  "total_records": 166,
+  "duplicates_removed": 112,
+  "date_overlap": true,
+  "overlap_count": 112,
+  "timestamp": "2025-08-19T06:31:42.094859",
+  "backup_path": "data/backups/historical_data_backup_20250819_063142.csv",
+  "final_data_path": "data/historical_data.csv"
+}
