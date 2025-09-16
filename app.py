@@ -1486,9 +1486,17 @@ def api_commodity_data_status():
 
 app.add_url_rule('/upload', 'data_control', data_control)
 
+# Di bagian akhir app.py, ganti bagian if __name__ == '__main__':
 if __name__ == '__main__':
-    print("🚀 Starting IPH Forecasting Dashboard...")
-    print("📊 Dashboard will be available at: http://localhost:5000")
-    print("📁 Data will be stored in: data/historical_data.csv")
-    print("🤖 Models will be saved in: data/models/")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_ENV', 'production') == 'development'
+    
+    # Untuk development
+    if debug_mode:
+        app.run(host='0.0.0.0', port=port, debug=True)
+    else:
+        # Untuk production, gunakan gunicorn
+        print(f"🚀 Starting production server on port {port}")
+        print("📊 Dashboard will be available at: http://0.0.0.0:" + str(port))
+        app.run(host='0.0.0.0', port=port, debug=False)
