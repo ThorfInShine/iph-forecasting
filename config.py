@@ -65,3 +65,18 @@ config = {
     'production': ProductionConfig,
     'default': ProductionConfig
 }
+
+# config.py - tambahkan konfigurasi untuk production
+class ProductionConfig(Config):
+    DEBUG = False
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'production-secret-key-change-this'
+    
+    # Use server paths for Hostinger
+    UPLOAD_FOLDER = '/tmp/uploads'
+    DATA_FOLDER = '/tmp/data'
+    HISTORICAL_DATA_PATH = '/tmp/data/historical_data.csv'
+    MODELS_PATH = '/tmp/data/models/'
+    BACKUPS_PATH = '/tmp/data/backups/'
+    
+    # Hostinger specific
+    PORT = int(os.environ.get('PORT', 8000))
