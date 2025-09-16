@@ -360,3 +360,155 @@ class ModelManager:
             
         except Exception as e:
             print(f"❌ Error during model cleanup: {str(e)}")
+
+    def check_model_health(self, new_data_df):
+        """Check if models need retraining"""
+        if not hasattr(self, 'drift_detector'):
+            self.drift_detector = ModelDriftDetector()
+        
+        # Prepare features from new data
+        df_features = self.engine.prepare_features_safe(new_data_df)
+        X_new = df_features[self.engine.feature_cols].values
+        
+        # Get current best model performance
+        best_model = self.get_current_best_model()
+        
+        if best_model:
+            drift_result = self.drift_detector.detect_drift(X_new, best_model)
+            
+            if drift_result['drift_detected']:
+                print(f"🚨 DRIFT DETECTED: {drift_result['drift_signals']}")
+                print(f"📊 Drift score: {drift_result['drift_score']:.2f}")
+                print(f"💡 Recommendation: {drift_result['recommendation']}")
+            
+            return drift_result
+        
+        return {'drift_detected': False, 'reason': 'No reference model'}
+
+def create_ensemble_model(self, trained_models, results):
+    """Create ensemble from top performing models"""
+    
+    # Select top 3 models by MAE
+    model_scores = [(name, results[name]['mae']) for name in trained_models.keys()]
+    model_scores.sort(key=lambda x: x[1])
+    top_models = model_scores[:3]
+    
+    print(f"🏆 Creating ensemble from top 3 models: {[m[0] for m in top_models]}")
+    
+    # Calculate weights (inverse MAE)
+    weights = []
+    models = []
+    
+    for name, mae in top_models:
+        weight = 1.0 / (mae + 0.001)  # Avoid division by zero
+        weights.append(weight)
+        models.append(trained_models[name])
+    
+    # Normalize weights
+    total_weight = sum(weights)
+    weights = [w / total_weight for w in weights]
+    
+    # Create ensemble wrapper
+    ensemble = EnsembleModel(models, weights, [m[0] for m in top_models])
+    
+    return ensemble, weights
+
+class EnsembleModel:
+    """Ensemble model wrapper"""
+    
+    def __init__(self, models, weights, model_names):
+        self.models = models
+        self.weights = weights
+        self.model_names = model_names
+    
+    def predict(self, X):
+        """Weighted average prediction"""
+        predictions = []
+        
+        for model in self.models:
+            pred = model.predict(X)
+            predictions.append(pred)
+        
+        # Weighted average
+        ensemble_pred = np.average(predictions, weights=self.weights, axis=0)
+        return ensemble_pred
+    
+    def get_feature_importance(self):
+        """Weighted average feature importance"""
+        importances = []
+        
+        for model, weight in zip(self.models, self.weights):
+            if hasattr(model, 'feature_importances_'):
+                imp = model.feature_importances_ * weight
+                importances.append(imp)
+        
+        if importances:
+            return np.sum(importances, axis=0)
+        return None
+
+class ModelDriftDetector:
+    """Detect when models need retraining"""
+    
+    def __init__(self, drift_threshold=0.05):
+        self.drift_threshold = drift_threshold
+        self.reference_data = None
+        self.reference_performance = None
+    
+    def set_reference(self, X_reference, model_performance):
+        """Set reference data and performance"""
+        self.reference_data = {
+            'mean': np.mean(X_reference, axis=0),
+            'std': np.std(X_reference, axis=0),
+            'min': np.min(X_reference, axis=0),
+            'max': np.max(X_reference, axis=0)
+        }
+        self.reference_performance = model_performance
+    
+    def detect_drift(self, X_new, current_performance):
+        """Detect data drift and performance degradation"""
+        if self.reference_data is None:
+            return {'drift_detected': False, 'reason': 'No reference data'}
+        
+        drift_signals = []
+        
+        # 1. Statistical drift detection
+        new_stats = {
+            'mean': np.mean(X_new, axis=0),
+            'std': np.std(X_new, axis=0)
+        }
+        
+        # Check mean shift
+        mean_shift = np.abs(new_stats['mean'] - self.reference_data['mean'])
+        mean_threshold = self.reference_data['std'] * 2  # 2-sigma threshold
+        
+        if np.any(mean_shift > mean_threshold):
+            drift_signals.append('mean_shift')
+        
+        # Check variance change
+        std_ratio = new_stats['std'] / (self.reference_data['std'] + 1e-8)
+        if np.any((std_ratio > 2) | (std_ratio < 0.5)):
+            drift_signals.append('variance_change')
+        
+        # 2. Performance degradation
+        if self.reference_performance:
+            current_mae = current_performance.get('mae', float('inf'))
+            reference_mae = self.reference_performance.get('mae', 0)
+            
+            performance_degradation = (current_mae - reference_mae) / (reference_mae + 1e-8)
+            
+            if performance_degradation > 0.2:  # 20% performance drop
+                drift_signals.append('performance_degradation')
+        
+        drift_detected = len(drift_signals) > 0
+        
+        return {
+            'drift_detected': drift_detected,
+            'drift_signals': drift_signals,
+            'drift_score': len(drift_signals) / 3,  # Normalize to 0-1
+            'recommendation': 'retrain' if drift_detected else 'monitor',
+            'details': {
+                'mean_shift_detected': 'mean_shift' in drift_signals,
+                'variance_change_detected': 'variance_change' in drift_signals,
+                'performance_degraded': 'performance_degradation' in drift_signals
+            }
+        }

@@ -55,29 +55,41 @@ class ForecastService:
         print("   📊 Data handler ready")
     
     def process_new_data_and_forecast(self, new_data_df, forecast_weeks=8):
-        """Complete pipeline: new data -> retrain -> compare -> forecast"""
-        print("=" * 60)
-        print("🔄 STARTING COMPLETE FORECASTING PIPELINE")
-        print("=" * 60)
+        """ENHANCED pipeline with all ML improvements"""
+        print("🚀 STARTING ENHANCED ML PIPELINE")
         
         pipeline_start_time = datetime.now()
-        
+
         try:
-            # Step 1: Process and merge new data
-            print("\n📥 STEP 1: Processing new data...")
+            # Step 1: Data processing (unchanged)
             combined_df, merge_info = self.data_handler.merge_and_save_data(new_data_df)
             
-            # Step 2: Train and compare models
-            print("\n🤖 STEP 2: Training and comparing models...")
-            training_result = self.model_manager.train_and_compare_models(combined_df)
+            # ✅ NEW: Check for model drift
+            drift_result = self.model_manager.check_model_health(new_data_df)
             
-            # Step 3: Generate forecast with best model
-            print("\n🔮 STEP 3: Generating forecast...")
-            best_model_name = training_result['comparison']['new_best_model']['model_name']
+            if drift_result['drift_detected']:
+                print(f"🚨 Drift detected: {drift_result['drift_signals']}")
+                print("🔄 Forcing model retraining due to drift...")
+                force_retrain = True
+            else:
+                force_retrain = False
             
+            # Step 2: Enhanced model training
+            if force_retrain or not self.model_manager.get_current_best_model():
+                training_result = self.model_manager.train_and_compare_models(combined_df)
+            else:
+                print("✅ Using existing models (no drift detected)")
+                training_result = None
+            
+            # Step 3: Enhanced forecasting
+            best_model = self.model_manager.get_current_best_model()
+            best_model_name = best_model['model_name'] if best_model else 'XGBoost_Advanced'
+            
+            # Use enhanced forecasting
             forecast_df, model_performance, forecast_summary = self.model_manager.engine.generate_forecast(
                 best_model_name, forecast_weeks
             )
+            
             
             # Calculate pipeline duration
             pipeline_duration = (datetime.now() - pipeline_start_time).total_seconds()

@@ -2,7 +2,8 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 import pandas as pd
 import json
 import os
-from datetime import datetime
+import re  # TAMBAH IMPORT INI
+from datetime import datetime, timedelta  # 
 import plotly
 import plotly.graph_objs as go
 from werkzeug.utils import secure_filename
@@ -1095,57 +1096,190 @@ def commodity_insights():
 # API endpoints untuk commodity insights
 @app.route('/api/commodity/current-week')
 def api_commodity_current_week():
-    """Get current week commodity insights"""
+    """FIXED - Enhanced current week commodity insights"""
     try:
-        df_forecast = forecast_service.data_handler.load_historical_data()
+        print("🔍 API: Loading current week insights...")
         result = commodity_service.get_current_week_insights()
+        
+        print(f"📊 Current week result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        print(f"📊 Success status: {result.get('success')}")
+        
+        if result.get('success'):
+            print(f"   📅 Period keys: {list(result.get('period', {}).keys())}")
+            print(f"   📈 IPH analysis keys: {list(result.get('iph_analysis', {}).keys())}")
+            print(f"   🏷️ Category analysis count: {len(result.get('category_analysis', {}))}")
+        else:
+            print(f"   ❌ Error: {result.get('message', 'Unknown error')}")
+        
+        # Ensure all required fields exist
+        if result.get('success') and not result.get('iph_analysis'):
+            print("⚠️ Missing iph_analysis, creating fallback...")
+            iph_value = result.get('iph_value', 0)
+            result['iph_analysis'] = {
+                'value': float(iph_value),
+                'level': 'Unknown',
+                'color': 'secondary',
+                'direction': 'Unknown'
+            }
+        
         return jsonify(clean_for_json(result))
+        
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        print(f"❌ API Error - current week insights: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify(clean_for_json({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load current week insights. Please check if commodity data is available.',
+            'error_details': str(e)
+        }))
 
 @app.route('/api/commodity/monthly-analysis')
 def api_commodity_monthly():
-    """Get monthly commodity analysis"""
+    """FIXED - Enhanced monthly commodity analysis"""
     try:
-        month = request.args.get('month')
-        result = commodity_service.get_monthly_analysis(month)
+        month = request.args.get('month', '').strip()
+        print(f"🔍 API: Loading monthly analysis for month: '{month}'")
+        
+        result = commodity_service.get_monthly_analysis(month if month else None)
+        
+        print(f"📊 Monthly analysis result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        print(f"📊 Success: {result.get('success')}")
+        
+        if result.get('success'):
+            print(f"   📅 Month: {result.get('month')}")
+            print(f"   📊 Analysis period keys: {list(result.get('analysis_period', {}).keys())}")
+            print(f"   📈 IPH stats keys: {list(result.get('iph_statistics', {}).keys())}")
+        else:
+            print(f"   ❌ Error: {result.get('message')}")
+        
         return jsonify(clean_for_json(result))
+        
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        print(f"❌ API Error - monthly analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify(clean_for_json({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load monthly analysis. Please check if commodity data is available.',
+            'error_type': 'processing_error'
+        }))
 
 @app.route('/api/commodity/trends')
 def api_commodity_trends():
-    """Get commodity trends"""
+    """FIXED - Enhanced commodity trends"""
     try:
-        commodity = request.args.get('commodity')
+        commodity = request.args.get('commodity', '').strip()
         periods = int(request.args.get('periods', 4))
-        result = commodity_service.get_commodity_trends(commodity, periods)
+        
+        # Validate periods
+        if not (2 <= periods <= 24):
+            periods = 4
+        
+        print(f"🔍 API: Loading commodity trends - periods: {periods}, commodity: '{commodity}'")
+        
+        result = commodity_service.get_commodity_trends(
+            commodity if commodity else None, 
+            periods
+        )
+        
+        print(f"📊 Trends result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        print(f"📊 Success: {result.get('success')}")
+        
+        if result.get('success'):
+            trends_count = len(result.get('commodity_trends', {}))
+            print(f"   📈 Found {trends_count} commodity trends")
+            
+            # Debug first few trends
+            if result.get('commodity_trends'):
+                first_trend = list(result['commodity_trends'].items())[0] if result['commodity_trends'] else None
+                if first_trend:
+                    trend_name, trend_data = first_trend
+                    print(f"   🔍 First trend '{trend_name}' keys: {list(trend_data.keys())}")
+        
         return jsonify(clean_for_json(result))
+        
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/commodity/alerts')
-def api_commodity_alerts():
-    """Get commodity volatility alerts"""
-    try:
-        threshold = float(request.args.get('threshold', 0.05))
-        result = commodity_service.get_alert_commodities(threshold)
-        return jsonify(clean_for_json(result))
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        print(f"❌ API Error - commodity trends: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify(clean_for_json({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load commodity trends'
+        }))
 
 @app.route('/api/commodity/seasonal')
 def api_commodity_seasonal():
-    """Get seasonal commodity patterns"""
+    """FIXED - Enhanced seasonal commodity patterns"""
     try:
+        print("🔍 API: Loading seasonal patterns...")
+        
         result = commodity_service.get_seasonal_patterns()
+        
+        print(f"📊 Seasonal result structure: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        print(f"📊 Success: {result.get('success')}")
+        
+        if result.get('success'):
+            patterns_count = len(result.get('seasonal_patterns', {}))
+            print(f"   🗓️ Found {patterns_count} monthly patterns")
+            
+            # Debug structure
+            if result.get('seasonal_patterns'):
+                first_pattern = list(result['seasonal_patterns'].items())[0] if result['seasonal_patterns'] else None
+                if first_pattern:
+                    month_name, month_data = first_pattern
+                    print(f"   🔍 First pattern '{month_name}' keys: {list(month_data.keys())}")
+        
+        return jsonify(clean_for_json(result))
+        
+    except Exception as e:
+        print(f"❌ API Error - seasonal patterns: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify(clean_for_json({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load seasonal patterns'
+        }))
+
+@app.route('/api/commodity/alerts')
+def api_commodity_alerts():
+    """Enhanced commodity volatility alerts - FIXED VERSION"""
+    try:
+        threshold = float(request.args.get('threshold', 0.05))
+        
+        # Validate threshold
+        if not (0.01 <= threshold <= 0.5):
+            threshold = 0.05
+        
+        print(f"🔍 API: Loading volatility alerts with threshold: {threshold}")
+        
+        result = commodity_service.get_alert_commodities(threshold)
+        
+        print(f"📊 Alerts result: success={result.get('success')}")
+        if result.get('success'):
+            alerts_count = len(result.get('alerts', []))
+            print(f"   ⚠️ Found {alerts_count} alerts")
+        
         return jsonify(clean_for_json(result))
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        print(f"❌ API Error - commodity alerts: {str(e)}")
+        return jsonify(clean_for_json({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load commodity alerts'
+        }))
 
 @app.route('/api/commodity/upload', methods=['POST'])
 def upload_commodity_data():
-    """Upload commodity data separately from IPH data"""
+    """Enhanced commodity data upload with comprehensive validation - FIXED VERSION"""
     try:
         if 'file' not in request.files:
             return jsonify({'success': False, 'message': 'No file uploaded'})
@@ -1155,38 +1289,199 @@ def upload_commodity_data():
             return jsonify({'success': False, 'message': 'No file selected'})
         
         if file and file.filename.lower().endswith(('.csv', '.xlsx')):
-            # Save to commodity data path
-            commodity_path = 'data/commodity_data.csv'
+            # Save temporarily for processing
+            filename = secure_filename(file.filename)
+            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_commodity_{filename}")
+            file.save(temp_path)
             
-            # Read and validate
-            if file.filename.lower().endswith('.csv'):
-                df = pd.read_csv(file)
-            else:
-                df = pd.read_excel(file)
-            
-            # Check required columns
-            required_cols = ['Bulan', 'Minggu ke-', 'Indikator Perubahan Harga (%)']
-            missing = [col for col in required_cols if col not in df.columns]
-            
-            if missing:
+            try:
+                print(f"📂 Processing commodity file: {filename}")
+                
+                # Enhanced file reading with multiple encoding support
+                if filename.lower().endswith('.csv'):
+                    df = None
+                    for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                        try:
+                            df = pd.read_csv(temp_path, encoding=encoding)
+                            print(f"✅ CSV loaded successfully with {encoding} encoding")
+                            break
+                        except UnicodeDecodeError:
+                            print(f"⚠️ Failed to load with {encoding} encoding, trying next...")
+                            continue
+                    
+                    if df is None:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Unable to read CSV file with any encoding. Please save as UTF-8 CSV.'
+                        })
+                else:
+                    df = pd.read_excel(temp_path)
+                    print("✅ Excel file loaded successfully")
+                
+                print(f"📊 Loaded {len(df)} rows, {len(df.columns)} columns")
+                print(f"📋 Original columns: {list(df.columns)}")
+                
+                # Enhanced column validation with fuzzy matching
+                required_column_patterns = {
+                    'bulan': [r'.*[Bb]ulan.*', r'.*[Mm]onth.*'],
+                    'minggu': [r'.*[Mm]inggu.*', r'.*[Ww]eek.*'],
+                    'iph': [r'.*[Ii]ndikator.*[Pp]erubahan.*[Hh]arga.*', r'.*IPH.*', r'.*iph.*'],
+                    'komoditas_andil': [r'.*[Kk]omoditas.*[Aa]ndil.*', r'.*[Cc]ommodity.*[Ii]mpact.*'],
+                    'komoditas_fluktuasi': [r'.*[Kk]omoditas.*[Ff]luktuasi.*', r'.*[Vv]olatile.*[Cc]ommodity.*'],
+                    'nilai_fluktuasi': [r'.*[Ff]luktuasi.*[Hh]arga.*', r'.*[Vv]olatility.*[Vv]alue.*']
+                }
+                
+                column_mapping = {}
+                missing_requirements = []
+                
+                for req_type, patterns in required_column_patterns.items():
+                    found = False
+                    for pattern in patterns:
+                        for col in df.columns:
+                            if re.match(pattern, col, re.IGNORECASE):
+                                column_mapping[col] = req_type
+                                found = True
+                                break
+                        if found:
+                            break
+                    
+                    if not found and req_type in ['bulan', 'minggu', 'iph']:  # Only critical columns
+                        missing_requirements.append(req_type)
+                
+                if missing_requirements:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Missing critical columns: {", ".join(missing_requirements)}',
+                        'available_columns': list(df.columns),
+                        'required_patterns': {k: v[0] for k, v in required_column_patterns.items() if k in missing_requirements}
+                    })
+                
+                print(f"✅ Column mapping successful: {column_mapping}")
+                
+                # Apply basic data cleaning
+                df = df.dropna(how='all')  # Remove completely empty rows
+                
+                # Backup existing data if requested
+                commodity_path = commodity_service.commodity_data_path
+                if request.form.get('backup_existing') == 'true':
+                    if os.path.exists(commodity_path):
+                        backup_path = commodity_path.replace('.csv', f'_backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
+                        try:
+                            import shutil
+                            shutil.copy2(commodity_path, backup_path)
+                            print(f"📦 Existing data backed up to: {backup_path}")
+                        except Exception as backup_error:
+                            print(f"⚠️ Backup failed: {backup_error}")
+                
+                # Save new data
+                os.makedirs(os.path.dirname(commodity_path), exist_ok=True)
+                df.to_csv(commodity_path, index=False)
+                
+                # Clear service cache to force reload
+                commodity_service.commodity_cache = None
+                commodity_service.last_cache_time = None
+                
+                print(f"✅ Commodity data saved to: {commodity_path}")
+                
+                # Validate the saved data by trying to load it
+                try:
+                    test_df = commodity_service.load_commodity_data()
+                    if test_df.empty:
+                        print("⚠️ Warning: Saved data appears to be empty after processing")
+                except Exception as validation_error:
+                    print(f"⚠️ Data validation warning: {validation_error}")
+                
+                return jsonify(clean_for_json({
+                    'success': True,
+                    'message': 'Commodity data uploaded and processed successfully',
+                    'records': len(df),
+                    'columns_mapped': len(column_mapping),
+                    'original_columns': list(df.columns),
+                    'processing_info': {
+                        'empty_rows_removed': 'yes',
+                        'encoding_used': 'auto-detected',
+                        'backup_created': request.form.get('backup_existing') == 'true'
+                    }
+                }))
+                
+            except Exception as processing_error:
+                print(f"❌ Processing error: {str(processing_error)}")
+                import traceback
+                traceback.print_exc()
+                
                 return jsonify({
                     'success': False, 
-                    'message': f'Missing required columns: {missing}'
+                    'message': f'File processing failed: {str(processing_error)}',
+                    'error_type': 'processing_error'
                 })
-            
-            # Save to commodity data file
-            df.to_csv(commodity_path, index=False)
-            
-            return jsonify({
-                'success': True,
-                'message': f'Commodity data uploaded successfully',
-                'records': len(df)
-            })
+                
+            finally:
+                # Clean up temp file
+                try:
+                    os.remove(temp_path)
+                    print(f"🗑️ Cleaned up temp file: {temp_path}")
+                except:
+                    pass
         
-        return jsonify({'success': False, 'message': 'Invalid file format'})
+        return jsonify({
+            'success': False, 
+            'message': 'Invalid file format. Please upload CSV or Excel file.',
+            'allowed_formats': ['.csv', '.xlsx']
+        })
         
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        print(f"❌ Upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify(clean_for_json({
+            'success': False, 
+            'message': f'Upload failed: {str(e)}',
+            'error_type': type(e).__name__
+        }))
+
+@app.route('/api/commodity/data-status')
+def api_commodity_data_status():
+    """Check commodity data availability"""
+    try:
+        df = commodity_service.load_commodity_data()
+        
+        return jsonify(clean_for_json({
+            'success': True,
+            'has_data': not df.empty,
+            'record_count': len(df) if not df.empty else 0,
+            'date_range': {
+                'start': df['Tanggal'].min().strftime('%Y-%m-%d') if not df.empty and 'Tanggal' in df.columns else None,
+                'end': df['Tanggal'].max().strftime('%Y-%m-%d') if not df.empty and 'Tanggal' in df.columns else None
+            } if not df.empty else None,
+            'columns': list(df.columns) if not df.empty else [],
+            'last_updated': datetime.now().isoformat()
+        }))
+    except Exception as e:
+        print(f"❌ Commodity data status error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'has_data': False,
+            'record_count': 0
+        })
+
+
+    """Enhanced current week commodity insights"""
+    try:
+        result = commodity_service.get_current_week_insights()
+        return jsonify(clean_for_json(result))
+    except Exception as e:
+        print(f"❌ API Error - current week: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False, 
+            'error': str(e),
+            'message': 'Failed to load current week insights',
+            'error_details': str(e)
+        })
 
 
 app.add_url_rule('/upload', 'data_control', data_control)

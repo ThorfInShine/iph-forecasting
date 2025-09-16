@@ -16,34 +16,41 @@ class XGBoostAdvanced(BaseEstimator, RegressorMixin):
     """Advanced XGBoost model with optimized parameters for time series forecasting"""
     
     def __init__(self):
-        self.n_estimators = 200
-        self.learning_rate = 0.05
-        self.max_depth = 4
-        self.min_child_weight = 3
-        self.subsample = 0.8
-        self.colsample_bytree = 0.8
-        self.reg_alpha = 0.1
-        self.reg_lambda = 0.1
-        self.random_state = 42
+        self.params = {
+            'n_estimators': 150,          # Reduced to prevent overfitting
+            'learning_rate': 0.08,        # Slightly higher for faster convergence
+            'max_depth': 3,               # Shallower trees
+            'min_child_weight': 5,        # Higher regularization
+            'subsample': 0.9,             # More data per tree
+            'colsample_bytree': 0.9,      # More features per tree
+            'reg_alpha': 0.05,            # L1 regularization
+            'reg_lambda': 0.1,            # L2 regularization
+            'random_state': 42,
+            'verbosity': 0,
+            'objective': 'reg:squarederror',
+            'eval_metric': 'mae'          # Focus on MAE
+        }
         self.model = None
         
     def fit(self, X, y):
-        """Fit the XGBoost model"""
-        self.model = XGBRegressor(
-            n_estimators=self.n_estimators,
-            learning_rate=self.learning_rate,
-            max_depth=self.max_depth,
-            min_child_weight=self.min_child_weight,
-            subsample=self.subsample,
-            colsample_bytree=self.colsample_bytree,
-            reg_alpha=self.reg_alpha,
-            reg_lambda=self.reg_lambda,
-            random_state=self.random_state,
-            verbosity=0
-        )
-        self.model.fit(X, y)
-        return self
-    
+        """Enhanced fit with early stopping"""
+        # Split for early stopping
+        if len(X) > 20:
+            split_idx = int(0.8 * len(X))
+            X_train, X_val = X[:split_idx], X[split_idx:]
+            y_train, y_val = y[:split_idx], y[split_idx:]
+            
+            self.model = XGBRegressor(**self.params)
+            self.model.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                early_stopping_rounds=10,
+                verbose=False
+            )
+        else:
+            self.model = XGBRegressor(**self.params)
+            self.model.fit(X, y)
+        
     def predict(self, X):
         """Make predictions"""
         if self.model is None:
@@ -56,110 +63,250 @@ class XGBoostAdvanced(BaseEstimator, RegressorMixin):
             return self.model.feature_importances_
         return None
 
+class ModelOptimizer:
+    """Optimize model hyperparameters"""
+    
+    def __init__(self):
+        self.optimization_budget = 20  # trials per model
+    
+    def optimize_random_forest(self, X, y):
+        """Optimize Random Forest"""
+        best_params = {
+            'n_estimators': 100,
+            'max_depth': 4,
+            'min_samples_leaf': 3,
+            'min_samples_split': 5,
+            'random_state': 42
+        }
+        
+        # Quick grid search for critical parameters
+        param_grid = {
+            'max_depth': [3, 4, 5],
+            'min_samples_leaf': [2, 3, 5],
+            'n_estimators': [50, 100, 150]
+        }
+        
+        best_score = float('inf')
+        
+        for max_depth in param_grid['max_depth']:
+            for min_samples_leaf in param_grid['min_samples_leaf']:
+                for n_estimators in param_grid['n_estimators']:
+                    params = {
+                        'n_estimators': n_estimators,
+                        'max_depth': max_depth,
+                        'min_samples_leaf': min_samples_leaf,
+                        'min_samples_split': 5,
+                        'random_state': 42,
+                        'n_jobs': -1
+                    }
+                    
+                    # Quick CV evaluation
+                    score = self._evaluate_params(RandomForestRegressor(**params), X, y)
+                    
+                    if score < best_score:
+                        best_score = score
+                        best_params = params
+        
+        print(f"✅ RF optimized: MAE improved to {best_score:.4f}")
+        return best_params
+    
+    def optimize_lightgbm(self, X, y):
+        """Optimize LightGBM"""
+        param_grid = {
+            'n_estimators': [100, 150, 200],
+            'learning_rate': [0.05, 0.08, 0.1],
+            'max_depth': [3, 4, 5],
+            'num_leaves': [15, 31, 50]
+        }
+        
+        best_params = {
+            'n_estimators': 100,
+            'learning_rate': 0.05,
+            'max_depth': 3,
+            'num_leaves': 15,
+            'reg_alpha': 0.1,
+            'reg_lambda': 0.1,
+            'random_state': 42,
+            'verbose': -1,
+            'force_col_wise': True
+        }
+        
+        best_score = float('inf')
+        
+        # Simplified optimization (avoid overfitting on small data)
+        for lr in param_grid['learning_rate']:
+            for depth in param_grid['max_depth']:
+                params = best_params.copy()
+                params.update({'learning_rate': lr, 'max_depth': depth})
+                
+                score = self._evaluate_params(LGBMRegressor(**params), X, y)
+                
+                if score < best_score:
+                    best_score = score
+                    best_params = params
+        
+        print(f"✅ LightGBM optimized: MAE improved to {best_score:.4f}")
+        return best_params
+    
+    def _evaluate_params(self, model, X, y):
+        """Quick parameter evaluation"""
+        if len(X) < 10:
+            return float('inf')
+        
+        # Simple holdout validation
+        split_idx = int(0.8 * len(X))
+        X_train, X_test = X[:split_idx], X[split_idx:]
+        y_train, y_test = y[:split_idx], y[split_idx:]
+        
+        try:
+            model.fit(X_train, y_train)
+            pred = model.predict(X_test)
+            return mean_absolute_error(y_test, pred)
+        except:
+            return float('inf')
+
 class ForecastingEngine:
     """Main forecasting engine for IPH prediction"""
     
     def __init__(self, data_path='data/historical_data.csv', models_path='data/models/'):
-        self.data_path = data_path
-        self.models_path = models_path
-        self.feature_cols = ['Lag_1', 'Lag_2', 'Lag_3', 'Lag_4', 'MA_3', 'MA_7']
+        self.optimizer = ModelOptimizer()
         
-        # Initialize models with optimized parameters
+        # ✅ OPTIMIZED MODELS
         self.models = {
             'KNN': KNeighborsRegressor(n_neighbors=5, weights='distance'),
-            'Random_Forest': RandomForestRegressor(
-                n_estimators=100, 
-                max_depth=4, 
-                min_samples_leaf=3, 
-                min_samples_split=5,
-                random_state=42,
-                n_jobs=-1
-            ),
-            'LightGBM': LGBMRegressor(
-                n_estimators=100, 
-                learning_rate=0.05, 
-                max_depth=3, 
-                num_leaves=15,
-                reg_alpha=0.1, 
-                reg_lambda=0.1, 
-                random_state=42, 
-                verbose=-1,
-                force_col_wise=True
-            ),
+            'Random_Forest': None,  # Will be optimized
+            'LightGBM': None,       # Will be optimized  
             'XGBoost_Advanced': XGBoostAdvanced()
         }
+
+    def _optimize_models_for_data(self, X, y):
+        """Optimize models based on current data"""
+        print("🔧 Optimizing models for current dataset...")
         
-        # Create directories
-        os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
-        os.makedirs(self.models_path, exist_ok=True)
-    
-    def prepare_features(self, df):
-        """Prepare lag and moving average features for time series"""
-        print("🔧 Preparing features...")
+        # Optimize Random Forest
+        rf_params = self.optimizer.optimize_random_forest(X, y)
+        self.models['Random_Forest'] = RandomForestRegressor(**rf_params)
         
+        # Optimize LightGBM
+        lgb_params = self.optimizer.optimize_lightgbm(X, y)
+        self.models['LightGBM'] = LGBMRegressor(**lgb_params)
+        
+        print("✅ Model optimization completed")
+
+    def prepare_features_safe(self, df, split_index=None):
+        """Leak-free feature preparation"""
         df_copy = df.copy()
         
-        # Ensure proper datetime format
-        if 'Tanggal' in df_copy.columns:
-            df_copy['Tanggal'] = pd.to_datetime(df_copy['Tanggal'])
+        if split_index is not None:
+            # Training: only use data up to split_index
+            train_data = df_copy.iloc[:split_index]
+            test_data = df_copy.iloc[split_index:]
+            
+            # Calculate features separately
+            train_features = self._calculate_features(train_data)
+            test_features = self._calculate_features_test(test_data, train_data)
+            
+            return train_features, test_features
+        else:
+            # Full dataset (for production forecasting only)
+            return self._calculate_features(df_copy)
+
+    def _calculate_features(self, df):
+        """Calculate features without future data"""
+        df = df.copy()
+        
+        # Lag features (safe)
+        for lag in [1, 2, 3, 4]:
+            df[f'Lag_{lag}'] = df['Indikator_Harga'].shift(lag)
+        
+        # Moving averages (safe)
+        df['MA_3'] = df['Indikator_Harga'].rolling(window=3, min_periods=1).mean()
+        df['MA_7'] = df['Indikator_Harga'].rolling(window=7, min_periods=1).mean()
+        
+        return df.dropna(subset=self.feature_cols)
+
+    def _calculate_features_test(self, test_df, train_df):
+        """Calculate test features using only historical data"""
+        combined_df = pd.concat([train_df, test_df]).reset_index(drop=True)
+        train_size = len(train_df)
+        
+        # Calculate features on combined data
+        featured_df = self._calculate_features(combined_df)
+        
+        # Return only test portion
+        return featured_df.iloc[train_size:].dropna(subset=self.feature_cols)
+
+    def train_and_evaluate_models(self, df):
+        """ENHANCED training with all fixes"""
+        print("🚀 Starting ENHANCED model training with all fixes...")
         
         # Sort by date
-        df_copy = df_copy.sort_values('Tanggal').reset_index(drop=True)
+        df = df.sort_values('Tanggal').reset_index(drop=True)
         
-        # Create lag features (previous values)
-        for lag in [1, 2, 3, 4]:
-            df_copy[f'Lag_{lag}'] = df_copy['Indikator_Harga'].shift(lag)
+        if len(df) < 15:
+            print("⚠️ Small dataset: Using time series CV")
+            return self._train_with_time_series_cv_fixed(df)
         
-        # Create moving averages
-        df_copy['MA_3'] = df_copy['Indikator_Harga'].rolling(window=3, min_periods=1).mean()
-        df_copy['MA_7'] = df_copy['Indikator_Harga'].rolling(window=7, min_periods=1).mean()
+        # Time-based split
+        test_size = max(5, min(int(0.2 * len(df)), len(df) // 4))
+        split_index = len(df) - test_size
         
-        # Add time-based features
-        if 'Tanggal' in df_copy.columns:
-            df_copy['Month'] = df_copy['Tanggal'].dt.month
-            df_copy['Quarter'] = df_copy['Tanggal'].dt.quarter
-            df_copy['DayOfYear'] = df_copy['Tanggal'].dt.dayofyear
+        # ✅ FIXED: Leak-free feature preparation
+        train_df, test_df = self.prepare_features_safe(df, split_index)
         
-        # Remove rows with NaN values in required features
-        df_clean = df_copy.dropna(subset=self.feature_cols)
+        X_train = train_df[self.feature_cols].values
+        y_train = train_df['Indikator_Harga'].values
+        X_test = test_df[self.feature_cols].values
+        y_test = test_df['Indikator_Harga'].values
         
-        print(f"✅ Features prepared: {len(df_clean)} samples ready for training")
-        return df_clean
+        # ✅ NEW: Feature selection
+        best_features = self.select_best_features(X_train, y_train)
+        X_train = X_train[:, best_features]
+        X_test = X_test[:, best_features]
+        
+        # ✅ NEW: Model optimization
+        self._optimize_models_for_data(X_train, y_train)
+        
+        # Train models
+        results, trained_models = self._train_with_regular_split(X_train, X_test, y_train, y_test)
+        
+        # ✅ NEW: Create ensemble
+        if len(trained_models) >= 2:
+            ensemble_model, ensemble_weights = self.create_ensemble_model(trained_models, results)
+            
+            # Evaluate ensemble
+            ensemble_pred = ensemble_model.predict(X_test)
+            ensemble_mae = mean_absolute_error(y_test, ensemble_pred)
+            
+            # Add ensemble to results if it's better
+            best_individual_mae = min(results[name]['mae'] for name in results.keys())
+            
+            if ensemble_mae < best_individual_mae:
+                results['Ensemble'] = {
+                    'model': ensemble_model,
+                    'mae': float(ensemble_mae),
+                    'rmse': float(np.sqrt(mean_squared_error(y_test, ensemble_pred))),
+                    'r2_score': float(r2_score(y_test, ensemble_pred)),
+                    'mape': self._calculate_mape(y_test, ensemble_pred),
+                    'training_time': 0.0,
+                    'data_size': len(X_train),
+                    'test_size': len(X_test),
+                    'trained_at': datetime.now().isoformat(),
+                    'feature_importance': ensemble_model.get_feature_importance(),
+                    'is_ensemble': True,
+                    'ensemble_weights': ensemble_weights,
+                    'ensemble_models': ensemble_model.model_names
+                }
+                
+                print(f"🎉 Ensemble improved MAE: {ensemble_mae:.4f} vs {best_individual_mae:.4f}")
+        
+        # Update best model flag
+        best_model_name = min(results.keys(), key=lambda x: results[x]['mae'])
+        for model_name in results:
+            results[model_name]['is_best'] = (model_name == best_model_name)
+        
+        return results, trained_models
     
-    def train_and_evaluate_models(self, df):
-        """Train all models and return performance metrics"""
-        print("🚀 Starting model training and evaluation...")
-        
-        # Prepare features
-        df_features = self.prepare_features(df)
-        
-        if len(df_features) == 0:
-            raise ValueError("❌ No valid data after feature preparation")
-        
-        print(f"📊 Dataset prepared: {len(df_features)} samples")
-        
-        # Split features and target
-        X = df_features[self.feature_cols].values
-        y = df_features['Indikator_Harga'].values
-        
-        # Improved train/test split strategy
-        if len(X) < 20:
-            # For very small datasets, use time series cross-validation
-            print("🔄 Using time series cross-validation for small dataset...")
-            return self._train_with_time_series_cv(df_features, X, y)
-        else:
-            # For larger datasets, use traditional split
-            test_size = max(5, min(int(0.2 * len(X)), len(X) // 4))  # 20% but at least 5, max 25%
-            split_point = len(X) - test_size
-            
-            X_train, X_test = X[:split_point], X[split_point:]
-            y_train, y_test = y[:split_point], y[split_point:]
-            
-            print(f"📈 Training set: {len(X_train)} samples")
-            print(f"🧪 Test set: {len(X_test)} samples")
-            
-            return self._train_with_regular_split(X_train, X_test, y_train, y_test)
-
     def _train_with_regular_split(self, X_train, X_test, y_train, y_test):
         """Train with regular train/test split"""
         results = {}
@@ -238,95 +385,68 @@ class ForecastingEngine:
         
         return results, trained_models
 
-    def _train_with_time_series_cv(self, df_features, X, y):
-        """Train with time series cross-validation for small datasets"""
-        results = {}
-        trained_models = {}
+    def _train_with_time_series_cv(self, df):
+        """FIXED time series cross-validation"""
+        validator = TimeSeriesValidator(n_splits=3, test_size=0.25)
+        splits = validator.split(df)
         
-        # Use expanding window approach
-        n_splits = max(3, min(5, len(X) - 5))  # 3-5 splits, ensure at least 5 samples for training
+        if not splits:
+            raise ValueError("Insufficient data for time series validation")
+        
+        results = {}
         
         for name, model in self.models.items():
-            try:
-                print(f"🤖 Training {name} with {n_splits}-fold CV...")
-                start_time = datetime.now()
+            print(f"🤖 Training {name} with {len(splits)}-fold time series CV...")
+            
+            cv_scores = []
+            
+            for train_end, test_start, test_end in splits:
+                # ✅ FIXED: Proper feature preparation per split
+                train_subset = df.iloc[:train_end]
+                test_subset = df.iloc[test_start:test_end]
                 
-                cv_scores = []
+                # Prepare features safely
+                train_features = self._calculate_features(train_subset)
+                test_features = self._calculate_features_test(test_subset, train_subset)
                 
-                for i in range(n_splits):
-                    # Expanding window: train on [0:train_end], test on [train_end:train_end+1]
-                    train_end = len(X) - n_splits + i
-                    test_idx = train_end
-                    
-                    if test_idx < len(X):
-                        X_train_cv = X[:train_end]
-                        X_test_cv = X[test_idx:test_idx+1]
-                        y_train_cv = y[:train_end]
-                        y_test_cv = y[test_idx:test_idx+1]
-                        
-                        if len(X_train_cv) >= 3:  # Minimum samples for training
-                            # Create fresh model instance
-                            if name == 'XGBoost_Advanced':
-                                model_cv = XGBoostAdvanced()
-                            else:
-                                model_cv = type(model)(**model.get_params() if hasattr(model, 'get_params') else {})
-                            
-                            model_cv.fit(X_train_cv, y_train_cv)
-                            y_pred_cv = model_cv.predict(X_test_cv)
-                            
-                            mae_cv = mean_absolute_error(y_test_cv, y_pred_cv)
-                            cv_scores.append(mae_cv)
+                if len(train_features) < 5 or len(test_features) < 1:
+                    continue
                 
-                # Train final model on all data
-                model.fit(X, y)
-                training_time = (datetime.now() - start_time).total_seconds()
+                X_train_cv = train_features[self.feature_cols].values
+                y_train_cv = train_features['Indikator_Harga'].values
+                X_test_cv = test_features[self.feature_cols].values
+                y_test_cv = test_features['Indikator_Harga'].values
                 
-                # Use CV scores for evaluation
-                if cv_scores:
-                    mae = np.mean(cv_scores)
-                    rmse = mae * 1.2  # Approximate RMSE
-                    r2 = max(0.0, 1.0 - (mae / (np.std(y) + 1e-8))**2)  # Approximate R²
-                    mape = min(200.0, mae / (np.mean(np.abs(y)) + 1e-8) * 100)  # Approximate MAPE
-                else:
-                    # Fallback: use simple metrics
-                    y_pred_all = model.predict(X)
-                    mae = mean_absolute_error(y, y_pred_all)
-                    rmse = np.sqrt(mean_squared_error(y, y_pred_all))
-                    r2 = 0.0  # Don't trust R² for same data
-                    mape = 100.0
+                # Train and evaluate
+                model_cv = self._create_fresh_model(name)
+                model_cv.fit(X_train_cv, y_train_cv)
+                y_pred_cv = model_cv.predict(X_test_cv)
                 
-                results[name] = {
-                    'model': model,
-                    'mae': float(mae),
-                    'rmse': float(rmse),
-                    'r2_score': float(r2),
-                    'mape': float(mape),
-                    'training_time': float(training_time),
-                    'data_size': int(len(X)),
-                    'test_size': int(n_splits),
-                    'trained_at': datetime.now().isoformat(),
-                    'feature_importance': self._get_feature_importance(model),
-                    'cv_method': 'time_series_expanding'
-                }
-                
-                trained_models[name] = model
-                print(f"✅ {name}: MAE={mae:.4f} (CV), RMSE={rmse:.4f}, R²={r2:.4f}, MAPE={mape:.2f}%")
-                
-            except Exception as e:
-                print(f"❌ Error training {name}: {str(e)}")
-                continue
+                mae_cv = mean_absolute_error(y_test_cv, y_pred_cv)
+                cv_scores.append(mae_cv)
+            
+            # Final model training on all data
+            full_features = self._calculate_features(df)
+            X_full = full_features[self.feature_cols].values
+            y_full = full_features['Indikator_Harga'].values
+            
+            model.fit(X_full, y_full)
+            
+            # Use CV scores for evaluation
+            mae = np.mean(cv_scores) if cv_scores else float('inf')
+            rmse = np.sqrt(np.mean([score**2 for score in cv_scores])) if cv_scores else float('inf')
+            
+            results[name] = {
+                'model': model,
+                'mae': float(mae),
+                'rmse': float(rmse),
+                'r2_score': 0.0,  # Don't trust R² in CV
+                'cv_scores': cv_scores,
+                'cv_std': float(np.std(cv_scores)) if cv_scores else 0.0,
+                'validation_method': 'time_series_cv_fixed'
+            }
         
-        if not results:
-            raise ValueError("❌ No models were successfully trained")
-        
-        # Determine best model
-        best_model_name = min(results.keys(), key=lambda x: results[x]['mae'])
-        for model_name in results:
-            results[model_name]['is_best'] = bool(model_name == best_model_name)
-        
-        print(f"🏆 Best model: {best_model_name} (MAE: {results[best_model_name]['mae']:.4f})")
-        
-        return results, trained_models
+        return results, {name: result['model'] for name, result in results.items()}
 
     def _get_feature_importance(self, model):
         """Get feature importance if available"""
@@ -417,60 +537,89 @@ class ForecastingEngine:
             return None
     
     def forecast_multistep(self, model, last_features, n_steps):
-        """Multi-step ahead forecasting with confidence intervals"""
-        print(f"🔮 Generating {n_steps}-step forecast...")
+        """Enhanced forecasting with better uncertainty estimation"""
+        print(f"🔮 Generating {n_steps}-step forecast with enhanced uncertainty...")
         
         predictions = []
-        predictions_lower = []
-        predictions_upper = []
+        uncertainties = []
         current_features = last_features.copy()
         
-        # Calculate historical volatility for confidence intervals
-        historical_std = np.std(last_features[:4])  # Use lag values as proxy
-        base_confidence = 1.96 * historical_std
+        # Calculate historical volatility for better confidence intervals
+        historical_volatility = np.std(last_features[:4])
+        
+        # Monte Carlo simulation for uncertainty
+        n_simulations = 50
         
         for step in range(n_steps):
-            # Predict next value
-            pred = model.predict(current_features.reshape(1, -1))[0]
-            predictions.append(pred)
+            step_predictions = []
             
-            # Calculate expanding confidence intervals
-            confidence_factor = base_confidence * np.sqrt(step + 1) * 1.2  # Slight increase for uncertainty
-            predictions_lower.append(pred - confidence_factor)
-            predictions_upper.append(pred + confidence_factor)
-            
-            # Update features for next prediction
-            new_features = np.zeros_like(current_features)
-            
-            # Update lag features
-            new_features[0] = pred  # Lag_1
-            for i in range(1, 4):  # Lag_2, Lag_3, Lag_4
-                if i < len(current_features):
-                    new_features[i] = current_features[i-1]
-            
-            # Update moving averages with more sophisticated calculation
-            if step == 0:
-                new_features[4] = np.mean([pred, current_features[0], current_features[1]])  # MA_3
-                new_features[5] = np.mean(current_features[:4])  # MA_7
-            else:
-                # Use recent predictions for MA calculation
-                recent_values = [pred] + [predictions[max(0, step-i)] for i in range(1, min(3, step+1))]
-                new_features[4] = np.mean(recent_values[:3])
+            # Multiple predictions with noise injection
+            for sim in range(n_simulations):
+                # Add small noise to features (representing uncertainty)
+                noise_factor = 0.01 * historical_volatility * np.sqrt(step + 1)
+                noisy_features = current_features + np.random.normal(0, noise_factor, current_features.shape)
                 
-                recent_values_7 = [pred] + [predictions[max(0, step-i)] for i in range(1, min(7, step+1))]
-                new_features[5] = np.mean(recent_values_7[:7])
+                pred = model.predict(noisy_features.reshape(1, -1))[0]
+                step_predictions.append(pred)
             
+            # Calculate statistics
+            mean_pred = np.mean(step_predictions)
+            std_pred = np.std(step_predictions)
+            
+            predictions.append(mean_pred)
+            uncertainties.append(std_pred)
+            
+            # ✅ IMPROVED: Better feature updating
+            new_features = self._update_features_smartly(current_features, mean_pred, predictions, step)
             current_features = new_features
         
-        print(f"✅ Forecast completed: avg={np.mean(predictions):.3f}, trend={'↗' if predictions[-1] > predictions[0] else '↘'}")
+        # Calculate confidence intervals (more sophisticated)
+        confidence_multiplier = 1.96  # 95% confidence
+        lower_bounds = [pred - conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
+        upper_bounds = [pred + conf * confidence_multiplier for pred, conf in zip(predictions, uncertainties)]
+        
+        print(f"✅ Enhanced forecast: avg={np.mean(predictions):.3f}, uncertainty={np.mean(uncertainties):.3f}")
         
         return {
             'predictions': np.array(predictions),
-            'lower_bound': np.array(predictions_lower),
-            'upper_bound': np.array(predictions_upper),
-            'confidence_width': np.mean(np.array(predictions_upper) - np.array(predictions_lower))
+            'lower_bound': np.array(lower_bounds),
+            'upper_bound': np.array(upper_bounds),
+            'uncertainties': np.array(uncertainties),
+            'confidence_width': np.mean(np.array(upper_bounds) - np.array(lower_bounds)),
+            'method': 'monte_carlo_enhanced'
         }
+
+    def _update_features(self, current_features, new_pred, all_predictions, step):
+        """Smarter feature updating with trend consideration"""
+        new_features = np.zeros_like(current_features)
         
+        # Update lag features
+        new_features[0] = new_pred  # Lag_1
+        for i in range(1, min(4, len(current_features))):
+            new_features[i] = current_features[i-1]  # Shift previous lags
+        
+        # Update moving averages with trend awareness
+        if step == 0:
+            # First step: use current + historical
+            new_features[4] = np.mean([new_pred, current_features[0], current_features[1]])  # MA_3
+            new_features[5] = np.mean(current_features[:4])  # MA_7
+        else:
+            # Later steps: use recent predictions with exponential weighting
+            recent_preds = all_predictions[-min(3, len(all_predictions)):]
+            weights = np.exp(np.arange(len(recent_preds)))  # Exponential weights
+            weights = weights / weights.sum()
+            
+            new_features[4] = np.average(recent_preds, weights=weights)  # Weighted MA_3
+            
+            # MA_7 with longer history
+            recent_preds_7 = all_predictions[-min(7, len(all_predictions)):]
+            if len(recent_preds_7) > 1:
+                new_features[5] = np.mean(recent_preds_7)
+            else:
+                new_features[5] = new_pred
+        
+        return new_features
+     
     def generate_forecast(self, model_name, forecast_weeks=8):
         """Generate forecast using specified model"""
         print("=" * 100)
@@ -616,3 +765,73 @@ class ForecastingEngine:
                 continue
         
         return available_models
+    
+    def select_best_features(self, X, y, max_features=6):
+        """Automatic feature selection"""
+        from sklearn.feature_selection import SelectKBest, f_regression
+        from sklearn.model_selection import cross_val_score
+        
+        if len(X) < 20:
+            return list(range(X.shape[1]))  # Use all features for small datasets
+        
+        # Recursive feature elimination with time series CV
+        best_score = float('inf')
+        best_features = list(range(X.shape[1]))
+        
+        for n_features in range(3, min(max_features + 1, X.shape[1] + 1)):
+            selector = SelectKBest(f_regression, k=n_features)
+            X_selected = selector.fit_transform(X, y)
+            
+            # Quick validation with simple model
+            from sklearn.linear_model import Ridge
+            model = Ridge(alpha=0.1)
+            
+            # Time series CV
+            scores = []
+            for i in range(3):
+                split_idx = int(0.7 * len(X_selected)) + i * int(0.1 * len(X_selected))
+                if split_idx < len(X_selected) - 2:
+                    X_train_fs = X_selected[:split_idx]
+                    X_test_fs = X_selected[split_idx:split_idx+2]
+                    y_train_fs = y[:split_idx]
+                    y_test_fs = y[split_idx:split_idx+2]
+                    
+                    model.fit(X_train_fs, y_train_fs)
+                    pred = model.predict(X_test_fs)
+                    mae = mean_absolute_error(y_test_fs, pred)
+                    scores.append(mae)
+            
+            avg_score = np.mean(scores) if scores else float('inf')
+            
+            if avg_score < best_score:
+                best_score = avg_score
+                best_features = selector.get_support(indices=True).tolist()
+        
+        print(f"✅ Selected {len(best_features)} best features: {best_features}")
+        return best_features
+
+class TimeSeriesValidator:
+        """Proper time series cross-validation"""
+        
+        def __init__(self, n_splits=5, test_size=0.2):
+            self.n_splits = n_splits
+            self.test_size = test_size
+        
+        def split(self, df):
+            """Walk-forward validation splits"""
+            n_samples = len(df)
+            test_samples = max(1, int(n_samples * self.test_size))
+            
+            splits = []
+            
+            for i in range(self.n_splits):
+                # Expanding window approach
+                train_end = n_samples - test_samples * (self.n_splits - i)
+                test_start = train_end
+                test_end = test_start + test_samples
+                
+                if train_end >= 10 and test_end <= n_samples:  # Minimum 10 samples for training
+                    splits.append((train_end, test_start, test_end))
+            
+            return splits
+

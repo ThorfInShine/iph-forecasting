@@ -1308,10 +1308,8 @@ class ForecastingDashboard {
             }, 2000);
         }
     }
-
     
 }
-
 
 async function quickRetrain() {
     if (confirm('Retrain all models? This will take a few minutes.')) {
